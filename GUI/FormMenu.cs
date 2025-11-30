@@ -61,6 +61,7 @@ namespace Jubby_AutoTrade_UI.GUI
         #endregion ## UI Update ##
 
         #region ## UI Event ##
+
         #region ## Button Click Event ##
         private void ButtonClickEvent(object sender, EventArgs e)
         {

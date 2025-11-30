@@ -456,13 +456,6 @@ namespace Jubby_AutoTrade_UI.COMMON
         #region ## Error Message ##
         public void ErrorMessage(string mes)
         {
-            if (IsFormOpen(typeof(FormError)) == false)
-            {
-                FormError formError = new FormError();
-                formError.labError2.Text = string.Format("{0}", mes);
-
-                formError.ShowDialog();
-            }
             return;
         }
         #endregion ## Error Message ##

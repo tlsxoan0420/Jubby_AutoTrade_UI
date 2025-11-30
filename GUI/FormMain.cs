@@ -21,7 +21,6 @@ namespace Jubby_AutoTrade_UI.GUI
         private FormGraphic formGraphic = new FormGraphic();
         private FormMenu formMenu = new FormMenu();
         private FormStatus formStatus = new FormStatus();
-        private FormError formError = new FormError();
         #endregion ## FormMain Define ##
 
         public FormMain()
@@ -57,7 +56,7 @@ namespace Jubby_AutoTrade_UI.GUI
             timer1.Enabled = true;
 
             this.Location = new Point(0, 0);
-            this.Size = new Size(1920, 60);
+            this.Size = new Size(2560, 60);
 
             PalMainArray[0].Visible = true;
             PalMainArray[1].Visible = false;
@@ -72,7 +71,7 @@ namespace Jubby_AutoTrade_UI.GUI
 
             PalMainArray[0].Visible = true;
             PalMainArray[0].Location = new Point(0, 0);
-            PalMainArray[0].Size = new Size(1920, 60);
+            PalMainArray[0].Size = new Size(2560, 60);
             PalMainArray[0].Controls.Add(formMenu);
             PalMainArray[0].Dock = DockStyle.Top;
 
@@ -86,7 +85,7 @@ namespace Jubby_AutoTrade_UI.GUI
             if (frame == Flag.ModeNumber.Logout)
             {
                 this.Location = new Point(0, 0);
-                this.Size = new Size(1920, 60);
+                this.Size = new Size(2560, 60);
 
                 PalMainArray[0].Visible = true;
                 PalMainArray[1].Visible = false;
@@ -101,7 +100,7 @@ namespace Jubby_AutoTrade_UI.GUI
 
                 PalMainArray[0].Visible = true;
                 PalMainArray[0].Location = new Point(0, 0);
-                PalMainArray[0].Size = new Size(1920, 60);
+                PalMainArray[0].Size = new Size(2560, 60);
                 PalMainArray[0].Controls.Add(formMenu);
                 PalMainArray[0].Dock = DockStyle.Top;
 
@@ -111,7 +110,7 @@ namespace Jubby_AutoTrade_UI.GUI
             {
 
                 this.Location = new Point(0, 0);
-                this.Size = new Size(1920, 1080);
+                this.Size = new Size(2560, 1440);
 
                 formMenu.Location = new Point(0, 0);
                 formMenu.Size = new Size(PalMainArray[0].Width, PalMainArray[0].Height);
@@ -135,23 +134,23 @@ namespace Jubby_AutoTrade_UI.GUI
 
                 PalMainArray[0].Visible = true;
                 PalMainArray[0].Location = new Point(0, 0);
-                PalMainArray[0].Size = new Size(1920, 60);
+                PalMainArray[0].Size = new Size(2560, 60);
                 PalMainArray[0].Controls.Add(formMenu);
                 PalMainArray[0].Dock = DockStyle.Top;
 
                 PalMainArray[1].Visible = true;
                 PalMainArray[1].Location = new Point(0, 60);
-                PalMainArray[1].Size = new Size(1920, 540);
+                PalMainArray[1].Size = new Size(2560, 720);
                 PalMainArray[1].Controls.Add(formGraphic);
 
                 PalMainArray[2].Visible = true;
-                PalMainArray[2].Location = new Point(0, 600);
-                PalMainArray[2].Size = new Size(1920, 420);
+                PalMainArray[2].Location = new Point(0, 780);
+                PalMainArray[2].Size = new Size(2560, 600);
                 PalMainArray[2].Controls.Add(formnDataChart);
 
                 PalMainArray[3].Visible = true;
-                PalMainArray[3].Location = new Point(0, 1020);
-                PalMainArray[3].Size = new Size(1920, 60);
+                PalMainArray[3].Location = new Point(0, 1380);
+                PalMainArray[3].Size = new Size(2560, 60);
                 PalMainArray[3].Controls.Add(formStatus);
                 PalMainArray[3].Dock = DockStyle.Bottom;
             }
@@ -196,10 +195,6 @@ namespace Jubby_AutoTrade_UI.GUI
                     break;
 
                 case Flag.ModeNumber.Error:
-                    formError.TopLevel = true;
-                    formError.TopMost = true;
-
-                    formError.ShowDialog();
                     break;
 
                 default:

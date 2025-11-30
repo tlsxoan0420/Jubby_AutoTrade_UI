@@ -52,24 +52,51 @@ namespace Jubby_AutoTrade_UI.COMMON
         #endregion ## User Status##
 
         #region ## Trade Data ##
+
+        // 1. 계좌 / 표지션 데이터
         public class TradeMarketData
         {
-
+            static public double Last_Price = 0;        // 1. 현재가
+            static public double Open_Price = 0;        // 2. 시가
+            static public double High_Price = 0;        // 3. 고가
+            static public double Low_Price = 0;         // 4. 저가
+            static public double Bid_Price = 0;         // 5. 매수호가
+            static public double Ask_Price = 0;         // 6. 매도호가
+            static public double Bid_Size = 0;          // 7. 매수잔량
+            static public double Ask_Size = 0;          // 8. 매도잔량
+            static public double Volume = 0;            // 9. 거래량
         }
 
+        // 2. 시장 호가 데이터
         public class TradeAccountData
         {
-
+            static public string Symbol = "";           // 1. 종목코드
+            static public double Quantity = 0;          // 2. 보유수량
+            static public double Avg_Price = 0;         // 3. 평균 매입가
+            static public double Pnl = 0;               // 4. 평가손익
+            static public double Available_Cash = 0;    // 5. 주문 가능 금액
         }
 
+        // 3. 주문 상태 데이터
         public class TradeOrderData
         {
-
+            static public double Order_ID = 0;          // 1. 주문번호
+            static public string Order_Trype = "";      // 2. 주문종류
+            static public double Order_Price = 0;       // 3. 주문가격
+            static public double Order_Quantity = 0;    // 4. 주문수량
+            static public double Filled_Quqntity = 0;   // 5. 체결수량
+            static public string Order_Time = "";       // 6. 주문시간
+            static public string Status = "";           // 7. 주문상태
         }
 
         public class TradeStrategyData
         {
-
+            static public string Symbol = "";                // 1. 종목
+            static public double Ma_5 = 0;                  // 2. 단기 이동평균
+            static public double Ma_20 = 0;                 // 3. 장기 이동평균
+            static public double RIS = 0;                   // 4. RSI 지표
+            static public double MACD = 0;                  // 5. MACD 지표
+            static public string Signal = "";               // 6. 전략 신호 (매수 / 매도 / NONE)
         }
         #endregion ## Trade Data ##
 

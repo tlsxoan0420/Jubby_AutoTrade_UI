@@ -51,53 +51,80 @@ namespace Jubby_AutoTrade_UI.COMMON
         }
         #endregion ## User Status##
 
+        #region ## Jubby Stock Info ##
+        public class JubbyStockInfo
+        {
+            public string Symbol { get; set; }          // 1. 종목 코드
+            public string Name { get; set; }            // 2. 종목명
+
+            // 3. 구성품 연결 (Composition)
+            // 3-1. 시세 정보 (항상 존재함)
+            public TradeMarketData Market { get; set; } = new TradeMarketData();
+
+            // 3-2. 내 잔고 정보 (내가 샀을 때만 데이터가 있음 -> 없으면 null일 수도 있음)
+            public TradeAccountData MyAccount { get; set; } = new TradeAccountData();
+
+            // 3-3. 전략 분석 정보 (항상 계산됨)
+            public TradeStrategyData Strategy { get; set; } = new TradeStrategyData();
+
+            // 3-4. 주문내역([중요]'여러 개'일 수 있으므로 List로 관리해야 함)
+            public List<TradeOrderData> OrderHistory { get; set; } = new List<TradeOrderData>();
+
+            // 4. 생성자: 종목 코드를 받아서 생성
+            public JubbyStockInfo(string symbol, string name)
+            {
+                this.Symbol = symbol;
+                this.Name = name;
+            }
+        }
+        #endregion ## Jubby Stock Info ##
+
         #region ## Trade Data ##
 
-        // 1. 계좌 / 표지션 데이터
+        // 1.  시세 정보 데이터
         public class TradeMarketData
         {
-            static public double Last_Price = 0;        // 1. 현재가
-            static public double Open_Price = 0;        // 2. 시가
-            static public double High_Price = 0;        // 3. 고가
-            static public double Low_Price = 0;         // 4. 저가
-            static public double Bid_Price = 0;         // 5. 매수호가
-            static public double Ask_Price = 0;         // 6. 매도호가
-            static public double Bid_Size = 0;          // 7. 매수잔량
-            static public double Ask_Size = 0;          // 8. 매도잔량
-            static public double Volume = 0;            // 9. 거래량
+            public double Last_Price { get; set; }        // 1. 현재가
+            public double Open_Price { get; set; }        // 2. 시가
+            public double High_Price { get; set; }        // 3. 고가
+            public double Low_Price { get; set; }         // 4. 저가
+            public double Bid_Price { get; set; }         // 5. 매수호가
+            public double Ask_Price { get; set; }         // 6. 매도호가
+            public double Bid_Size { get; set; }          // 7. 매수잔량
+            public double Ask_Size { get; set; }          // 8. 매도잔량
+            public double Volume { get; set; }            // 9. 거래량
         }
 
-        // 2. 시장 호가 데이터
+        // 2. 잔고 정보 데이터
         public class TradeAccountData
         {
-            static public string Symbol = "";           // 1. 종목코드
-            static public double Quantity = 0;          // 2. 보유수량
-            static public double Avg_Price = 0;         // 3. 평균 매입가
-            static public double Pnl = 0;               // 4. 평가손익
-            static public double Available_Cash = 0;    // 5. 주문 가능 금액
+            public double Quantity { get; set; }          // 1. 보유수량
+            public double Avg_Price { get; set; }         // 2. 평균 매입가
+            public double Pnl { get; set; }               // 3. 평가손익
+            public double Available_Cash { get; set; }    // 4. 주문 가능 금액
         }
 
-        // 3. 주문 상태 데이터
+        // 3. 전략 분석 정보 데이터
         public class TradeOrderData
         {
-            static public double Order_ID = 0;          // 1. 주문번호
-            static public string Order_Trype = "";      // 2. 주문종류
-            static public double Order_Price = 0;       // 3. 주문가격
-            static public double Order_Quantity = 0;    // 4. 주문수량
-            static public double Filled_Quqntity = 0;   // 5. 체결수량
-            static public string Order_Time = "";       // 6. 주문시간
-            static public string Status = "";           // 7. 주문상태
+            static public string Order_Trype { get; set; }       // 1. 주문종류
+            static public double Order_Price { get; set; }       // 2. 주문가격
+            static public double Order_Quantity { get; set; }    // 3. 주문수량
+            static public double Filled_Quqntity { get; set; }   // 4. 체결수량
+            static public string Order_Time { get; set; }        // 5. 주문시간
+            static public string Status { get; set; }            // 6. 주문상태
         }
 
+        // 4. 주문 내역 데이터
         public class TradeStrategyData
         {
-            static public string Symbol = "";                // 1. 종목
-            static public double Ma_5 = 0;                  // 2. 단기 이동평균
-            static public double Ma_20 = 0;                 // 3. 장기 이동평균
-            static public double RIS = 0;                   // 4. RSI 지표
-            static public double MACD = 0;                  // 5. MACD 지표
-            static public string Signal = "";               // 6. 전략 신호 (매수 / 매도 / NONE)
+            static public double Ma_5 { get; set; }                  // 1. 단기 이동평균
+            static public double Ma_20 { get; set; }                 // 2. 장기 이동평균
+            static public double RIS { get; set; }                   // 3. RSI 지표
+            static public double MACD { get; set; }                  // 4. MACD 지표
+            static public string Signal { get; set; }                // 5. 전략 신호 (매수 / 매도 / NONE)
         }
+
         #endregion ## Trade Data ##
 
         #region ## Mode Number ##

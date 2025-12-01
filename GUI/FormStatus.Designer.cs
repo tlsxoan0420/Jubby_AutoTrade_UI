@@ -87,7 +87,7 @@
             // FormStatus
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.ClientSize = new System.Drawing.Size(2560, 60);
             this.Controls.Add(this.labStatus4);
             this.Controls.Add(this.labStatus3);

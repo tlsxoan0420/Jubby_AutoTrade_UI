@@ -112,7 +112,7 @@
             // 
             // btnLogin1
             // 
-            this.btnLogin1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnLogin1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnLogin1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnLogin1.Font = new System.Drawing.Font("HY헤드라인M", 18F);
             this.btnLogin1.ForeColor = System.Drawing.Color.Silver;
@@ -161,7 +161,7 @@
             // FormLogin
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.ClientSize = new System.Drawing.Size(600, 450);
             this.Controls.Add(this.btnLogin3);
             this.Controls.Add(this.btnLogin4);

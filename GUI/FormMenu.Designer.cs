@@ -40,7 +40,7 @@
             // 
             // btnMenu1
             // 
-            this.btnMenu1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnMenu1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnMenu1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnMenu1.FlatAppearance.BorderSize = 0;
             this.btnMenu1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
@@ -57,7 +57,7 @@
             // 
             // btnMenu2
             // 
-            this.btnMenu2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnMenu2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnMenu2.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnMenu2.FlatAppearance.BorderSize = 0;
             this.btnMenu2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
@@ -74,7 +74,7 @@
             // 
             // btnMenu10
             // 
-            this.btnMenu10.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnMenu10.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnMenu10.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnMenu10.FlatAppearance.BorderSize = 0;
             this.btnMenu10.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
@@ -91,7 +91,7 @@
             // 
             // btnMenu3
             // 
-            this.btnMenu3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnMenu3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnMenu3.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnMenu3.FlatAppearance.BorderSize = 0;
             this.btnMenu3.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
@@ -109,7 +109,7 @@
             // lblProgramName
             // 
             this.lblProgramName.AutoSize = true;
-            this.lblProgramName.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.lblProgramName.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.lblProgramName.Font = new System.Drawing.Font("HY헤드라인M", 24F);
             this.lblProgramName.ForeColor = System.Drawing.Color.White;
             this.lblProgramName.Location = new System.Drawing.Point(12, 14);
@@ -125,7 +125,7 @@
             // labOperationText
             // 
             this.labOperationText.AutoSize = true;
-            this.labOperationText.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.labOperationText.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.labOperationText.Font = new System.Drawing.Font("HY헤드라인M", 24F);
             this.labOperationText.ForeColor = System.Drawing.Color.White;
             this.labOperationText.Location = new System.Drawing.Point(1161, 14);
@@ -138,7 +138,7 @@
             // FormMenu
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.ClientSize = new System.Drawing.Size(2560, 60);
             this.Controls.Add(this.labOperationText);
             this.Controls.Add(this.lblProgramName);

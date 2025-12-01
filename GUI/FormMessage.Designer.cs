@@ -79,7 +79,7 @@
             // 
             // btnMessage1
             // 
-            this.btnMessage1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnMessage1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnMessage1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnMessage1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnMessage1.Font = new System.Drawing.Font("HY헤드라인M", 10F);
@@ -98,7 +98,7 @@
             // 
             // btnMessage2
             // 
-            this.btnMessage2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnMessage2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnMessage2.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnMessage2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnMessage2.Font = new System.Drawing.Font("HY헤드라인M", 10F);
@@ -114,7 +114,7 @@
             // FormMessage
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.ClientSize = new System.Drawing.Size(800, 335);
             this.Controls.Add(this.btnMessage2);
             this.Controls.Add(this.btnMessage1);

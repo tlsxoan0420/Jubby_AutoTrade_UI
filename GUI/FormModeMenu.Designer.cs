@@ -37,7 +37,7 @@
             // 
             // btnModeMenu1
             // 
-            this.btnModeMenu1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnModeMenu1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnModeMenu1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnModeMenu1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnModeMenu1.Font = new System.Drawing.Font("HY헤드라인M", 10F);
@@ -52,7 +52,7 @@
             // 
             // btnModeMenu2
             // 
-            this.btnModeMenu2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnModeMenu2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnModeMenu2.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnModeMenu2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnModeMenu2.Font = new System.Drawing.Font("HY헤드라인M", 10F);
@@ -67,7 +67,7 @@
             // 
             // btnModeMenu3
             // 
-            this.btnModeMenu3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.btnModeMenu3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.btnModeMenu3.BackgroundImageLayout = System.Windows.Forms.ImageLayout.None;
             this.btnModeMenu3.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnModeMenu3.Font = new System.Drawing.Font("HY헤드라인M", 10F);
@@ -87,7 +87,7 @@
             // FormModeMenu
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(10)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.ClientSize = new System.Drawing.Size(150, 172);
             this.Controls.Add(this.btnModeMenu3);
             this.Controls.Add(this.btnModeMenu2);

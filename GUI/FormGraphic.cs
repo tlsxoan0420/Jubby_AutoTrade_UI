@@ -12,6 +12,9 @@ namespace Jubby_AutoTrade_UI.GUI
 {
     public partial class FormGraphic : Form
     {
+        #region ## FormGraphic Define ##
+
+        #endregion ## FormGraphic Define ##
         public FormGraphic()
         {
             InitializeComponent();

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Jubby_AutoTrade_UI.COMMON;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -18,6 +19,7 @@ namespace Jubby_AutoTrade_UI.GUI
         // [핵심] 4개의 표 각각을 위한 검색용 지도(Dictionary) 배열
         // _rowMaps[0]은 1번 표의 지도, _rowMaps[1]은 2번 표의 지도...
         private Dictionary<string, DataGridViewRow>[] ChartrowMaps;
+
         #endregion ## FormDataChart Define ##
         public FormDataChart()
         {
@@ -56,9 +58,9 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## UI Update ##
         public void UIUpdate()
         {
-            for(int i =0; i < dgvChartArray.Length; i++)
+            for (int i = 0; i < dgvChartArray.Length; i++)
             {
-                SetGridStyle(dgvChartArray[i],i);
+                SetGridStyle(dgvChartArray[i], i);
             }
         }
         #endregion ## UI Update ##
@@ -93,7 +95,7 @@ namespace Jubby_AutoTrade_UI.GUI
             dgv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(20, 20, 35);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.LightGray;
-            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("HY헤드라인M", 15, FontStyle.Bold);
+            dgv.ColumnHeadersDefaultCellStyle.Font = new Font("HY헤드라인M", 11, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 35;
 
             // 4. 컬럼 추가
@@ -164,8 +166,190 @@ namespace Jubby_AutoTrade_UI.GUI
         #endregion ## Set Grid Style ##
 
         #region ## Update Chart Data ##
+        private void UpdateData(int targetIndex, Flag.JubbyStockInfo stock, Flag.UpdateTarget target)
+        {
+            // 1. [안전장치] 인덱스가 범위를 벗어나면 무시
+            if (targetIndex < 0 || targetIndex >= dgvChartArray.Length) return;
 
+            DataGridView targetGrid = dgvChartArray[targetIndex];
+            Dictionary<string, DataGridViewRow> targetMap = ChartrowMaps[targetIndex];
+
+            // 2. [UI 스레드 처리] 다른 스레드에서 호출 시 충돌 방지
+            if (targetGrid.InvokeRequired)
+            {
+                this.Invoke(new Action(() => UpdateData(targetIndex, stock, target)));
+                return;
+            }
+
+            // 3. 데이터 갱신 로직
+            if (targetMap.ContainsKey(stock.Symbol) & target != Flag.UpdateTarget.OrderHistory)
+            {
+                // [A] 이미 있는 종목 -> 값만 변경 (업데이트)
+                DataGridViewRow row = targetMap[stock.Symbol];
+                SetRowValues(row, stock, target);
+            }
+            else
+            {
+                // [B] 없는 종목 -> 새로 추가
+                int rowIndex = targetGrid.Rows.Add();
+                DataGridViewRow row = targetGrid.Rows[rowIndex];
+
+                // 검색용 지도에 등록
+                targetMap.Add(stock.Symbol, row);
+
+                // 불변 데이터 세팅 (순위, 코드, 이름)
+                row.Cells["No"].Value = rowIndex + 1; // 순위 (1부터 시작)
+                row.Cells["Symbol"].Value = stock.Symbol;
+                row.Cells["Name"].Value = stock.Name;
+
+                SetRowValues(row, stock, target);
+            }
+        }
+
+        // [공통] 행에 값 채워넣는 함수 (코드 중복 방지)
+        // target 파라미터 추가!
+        private void SetRowValues(DataGridViewRow row, Flag.JubbyStockInfo stock, Flag.UpdateTarget target)
+        {
+            // 1. [Market] 시세 데이터 업데이트
+            if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Market)
+            {
+                if (stock.Market != null)
+                {
+                    row.Cells["Last_Price"].Value = stock.Market.Last_Price.ToString("N6");     // 1. 현재가
+                    row.Cells["Open_Price"].Value = stock.Market.Open_Price.ToString("N6");     // 2. 시가
+                    row.Cells["High_Price"].Value = stock.Market.High_Price.ToString("N6");     // 3. 고가
+                    row.Cells["Low_Price"].Value = stock.Market.Low_Price.ToString("N6");       // 4. 저가
+                    row.Cells["Bid_Price"].Value = stock.Market.Bid_Price.ToString("N6");       // 5. 매수호가
+                    row.Cells["Ask_Price"].Value = stock.Market.Ask_Price.ToString("N6");       // 6. 매도호가
+                    row.Cells["Bid_Size"].Value = stock.Market.Bid_Size.ToString("N6");         // 7. 매수잔량
+                    row.Cells["Ask_Size"].Value = stock.Market.Ask_Size.ToString("N6");         // 8. 매도잔량
+                    row.Cells["Volume"].Value = stock.Market.Volume.ToString("N6");             // 9. 거래량
+
+                    // 금액에 따른 색상 처리 추가 예정
+                    //Color color = stock.Market.Change_Rate > 0 ? Color.Red :
+                    //              (stock.Market.Change_Rate < 0 ? Color.Blue : Color.WhiteSmoke);
+                    //row.Cells["Price"].Style.ForeColor = color;
+                    //row.Cells["Rate"].Style.ForeColor = color;
+                }
+            }
+
+            // 2. [Account] 잔고 데이터 업데이트
+            if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Account)
+            {
+                // 시세가 1초에 10번 변해도, 잔고는 안 변했으면 이 코드는 실행 안 됨 (성능 이득)
+                row.Cells["Quantity"].Value = stock.MyAccount.Quantity.ToString("N6");              // 1. 보유수량
+                row.Cells["Avg_Price"].Value = stock.MyAccount.Avg_Price.ToString("N6");            // 2. 평균 매입가
+                row.Cells["Pnl"].Value = stock.MyAccount.Pnl.ToString("N6");                        // 3. 평가손익
+                row.Cells["Available_Cash"].Value = stock.MyAccount.Available_Cash.ToString("N6");  // 4. 주문 가능 금액
+            }
+
+            // 3. [Strategy] 전략 분석 정보 데이터 업데이트
+            if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.OrderHistory)
+            {
+                // 리스트가 존재하고 데이터가 하나라도 있어야 함
+                // OrderHistory는 List이므로 바로 .Status 접근 불가 -> 가장 최근 것(.Last) 하나만 가져옴
+                var lastOrder = stock.GetOrderListSafe().LastOrDefault(); // 아까 만든 Safe 함수 활용
+
+                if (lastOrder != null)
+                {
+                    row.Cells["Order_Type"].Value = lastOrder.Order_Type;                               // 1. 주문종류
+                    row.Cells["Order_Price"].Value = lastOrder.Order_Price.ToString("N6");              // 2. 주문가격
+                    row.Cells["Order_Quantity"].Value = lastOrder.Order_Quantity.ToString("N6");        // 3. 주문수량
+                    row.Cells["Filled_Quqntity"].Value = lastOrder.Filled_Quqntity.ToString("N6");      // 4. 체결수량
+                    row.Cells["Order_Time"].Value = lastOrder.Order_Time;                               // 5. 주문시간
+                    row.Cells["Status"].Value = lastOrder.Status;                                       // 6. 주문상태
+
+                    // 주문 상태별 색상 (예시)
+                    // if (lastOrder.Status == "체결") row.Cells["Order_Status"].Style.ForeColor = Color.Red;
+                }
+            }
+
+
+            // 4. [Order History] 주문 내역 데이터 업데이트
+            if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Strategy)
+            {
+                if (stock.Strategy != null)
+                {
+                    row.Cells["Ma_5"].Value = stock.Strategy.Ma_5.ToString("N6");                   // 1. 단기 이동평균
+                    row.Cells["Ma_20"].Value = stock.Strategy.Ma_20.ToString("N6");                 // 2. 장기 이동평균
+                    row.Cells["RIS"].Value = stock.Strategy.RIS.ToString("N6");                     // 3. RSI 지표
+                    row.Cells["MACD"].Value = stock.Strategy.MACD.ToString("N6");                   // 4. MACD 지표
+                    row.Cells["Signal"].Value = stock.Strategy.Signal;                              // 5. 전략 신호
+
+                    // 신호 배경색 처리 로직...
+                    //if (stock.Strategy.Signal == "BUY")
+                    //    row.Cells["Signal"].Style.BackColor = Color.Gold;
+                }
+            }
+        }
         #endregion ## Update Chart Data ##
+
+        #region ## Remove Chart Data ##
+        // [데이터 삭제 함수]
+        // targetIndex: 몇 번째 표에서 지울지 (0~3)
+        // symbol: 지울 종목 코드 (예: "005930")
+        private void RemoveData(int targetIndex, string symbol, Flag.UpdateTarget target)
+        {
+            // 1. [안전장치] 인덱스 범위 확인
+            if (targetIndex < 0 || targetIndex >= dgvChartArray.Length) return;
+
+            DataGridView targetGrid = dgvChartArray[targetIndex];
+            Dictionary<string, DataGridViewRow> targetMap = ChartrowMaps[targetIndex];
+
+            // 2. [UI 스레드 보호] 다른 스레드(통신)에서 호출 시 충돌 방지
+            if (targetGrid.InvokeRequired)
+            {
+                this.Invoke(new Action(() => RemoveData(targetIndex, symbol, target)));
+                return;
+            }
+
+            // 3. 삭제 로직 수행
+            if (targetMap.ContainsKey(symbol))
+            {
+                // (1) 지울 행(Row) 객체 찾기
+                DataGridViewRow row = targetMap[symbol];
+
+                // (2) 화면(Grid)에서 제거
+                targetGrid.Rows.Remove(row);
+
+                // (3) 검색 지도(Dictionary)에서도 제거 (★중요: 이거 안 하면 나중에 에러 남)
+                targetMap.Remove(symbol);
+                // [조건] 타겟이 '주문내역(OrderHistory)' 삭제인 경우
+                if (target == Flag.UpdateTarget.OrderHistory)
+                {
+                    // 1. 해당 종목이 존재하는지 확인 (몇 번째 표인지 targetIndex 필요)
+                    if (ChartrowMaps[targetIndex].ContainsKey(symbol))
+                    {
+                        row = ChartrowMaps[targetIndex][symbol];
+
+                        // 2. 행(Row)의 뒷주머니(Tag)에서 원본 객체(stock) 꺼내기
+                        if (row.Tag is Flag.JubbyStockInfo stock)
+                        {
+                            // 3. 실제 객체에게 삭제 명령 (클래스명X -> 변수명O)
+                            // ★주의: RemoveOrder 안에는 "주문번호(ID)"가 들어가야 합니다.
+                            // (만약 파라미터 symbol에 주문번호를 담아 오셨다면 이대로 쓰세요)
+                            stock.RemoveOrder(symbol);
+                        }
+                    }
+                }
+
+                // (4) 순번(No) 재정렬 (중간이 빠졌으니 1, 2, 3... 다시 매김)
+                ReindexRows(targetGrid);
+            }
+        }
+
+        // [순번 재정렬 헬퍼 함수]
+        // 중간에 2번이 삭제되면 3번->2번, 4번->3번으로 당겨줌
+        private void ReindexRows(DataGridView dgv)
+        {
+            // 표에 남아있는 모든 줄을 훑으면서 번호를 다시 매김
+            for (int i = 0; i < dgv.Rows.Count; i++)
+            {
+                // 행 인덱스(0부터 시작)에 +1을 해서 "No" 컬럼에 넣음
+                dgv.Rows[i].Cells["No"].Value = i + 1;
+            }
+        }
+        #endregion ## Remove Chart Data ##
     }
 
     #region ## DataGridView Extension Method 깜빡임 방지 확장 메서드 ##

@@ -1,5 +1,4 @@
-﻿using Jubby_AutoTrade_UI.COMMON;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -8,6 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Jubby_AutoTrade_UI.COMMON;
 
 namespace Jubby_AutoTrade_UI.GUI
 {
@@ -16,19 +16,26 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## FormDataChart Define ##
         private DataGridView[] dgvChartArray;
 
-        // [핵심] 4개의 표 각각을 위한 검색용 지도(Dictionary) 배열
-        // _rowMaps[0]은 1번 표의 지도, _rowMaps[1]은 2번 표의 지도...
+        /// [핵심] 4개의 표 각각을 위한 검색용 지도(Dictionary) 배열
+        // _rowMaps[0]은 1번 표의 지도, _rowMaps[1]은 2번 표의 지도
         private Dictionary<string, DataGridViewRow>[] ChartrowMaps;
 
+        /// 선택된 종목을 보여줄 차트 폼에 대한 참조
+        // 외부에서 생성한 FormStockChart를 받아서 여기에 보관해 둔다.
+        private FormGraphic formGraphic;
         #endregion ## FormDataChart Define ##
+
         public FormDataChart()
         {
             InitializeComponent();
+            UIOrganize();
         }
 
         #region ## UI Organize ##
         public void UIOrganize()
         {
+            formGraphic = new FormGraphic();
+
             dgvChartArray = new DataGridView[]
             {
                 dgvChart1,
@@ -44,6 +51,9 @@ namespace Jubby_AutoTrade_UI.GUI
             {
                 // 각 표마다 새로운 딕셔너리 생성
                 ChartrowMaps[i] = new Dictionary<string, DataGridViewRow>();
+
+                dgvChartArray[i].CellClick -= DgvChart_CellClick;
+                dgvChartArray[i].CellClick += DgvChart_CellClick;
             }
         }
         #endregion ## UI Organize ##
@@ -64,6 +74,8 @@ namespace Jubby_AutoTrade_UI.GUI
             }
         }
         #endregion ## UI Update ##
+
+        #region ## Chart Event ##
 
         #region ## Set Grid Style ##
         private void SetGridStyle(DataGridView dgv, int Chart)
@@ -193,6 +205,9 @@ namespace Jubby_AutoTrade_UI.GUI
                 // [B] 없는 종목 -> 새로 추가
                 int rowIndex = targetGrid.Rows.Add();
                 DataGridViewRow row = targetGrid.Rows[rowIndex];
+
+                // 원본 객체를 Tag에 저장해 두면 나중에 삭제/수정 시 유용
+                row.Tag = stock;
 
                 // 검색용 지도에 등록
                 targetMap.Add(stock.Symbol, row);
@@ -350,6 +365,46 @@ namespace Jubby_AutoTrade_UI.GUI
             }
         }
         #endregion ## Remove Chart Data ##
+
+        #endregion ## Chart Event ##
+
+        #region ## UI Event ##
+        /// 4개의 Chart Grid 중 어디를 클릭해도 공통으로 들어오는 이벤트 핸들러.
+        // 클릭된 행의 Symbol 값을 읽어서
+        // 차트 폼(FormStockChart)에 "이 종목 보여줘" 요청을 보낸다.
+        private void DgvChart_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                // 헤더 클릭은 무시
+                if (e.RowIndex < 0)
+                    return;
+
+                var dgv = sender as DataGridView;
+                if (dgv == null)
+                    return;
+
+                // Symbol 컬럼이 없으면 아무 것도 안 함
+                if (!dgv.Columns.Contains("Symbol"))
+                    return;
+
+                DataGridViewRow row = dgv.Rows[e.RowIndex];
+
+                // Symbol 값 가져오기
+                string symbol = Convert.ToString(row.Cells["Symbol"].Value);
+
+                if (string.IsNullOrWhiteSpace(symbol))
+                    return;
+
+                // 차트 폼이 설정되어 있으면 해당 종목 차트로 이동
+                formGraphic?.ShowStock(symbol);
+            }
+            catch
+            {
+
+            }
+        }
+        #endregion ## UI Event ##
     }
 
     #region ## DataGridView Extension Method 깜빡임 방지 확장 메서드 ##

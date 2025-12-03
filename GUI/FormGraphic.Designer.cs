@@ -28,21 +28,32 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.palGrapic1 = new System.Windows.Forms.Panel();
             this.SuspendLayout();
+            // 
+            // palGrapic1
+            // 
+            this.palGrapic1.Location = new System.Drawing.Point(0, 0);
+            this.palGrapic1.Name = "palGrapic1";
+            this.palGrapic1.Size = new System.Drawing.Size(2560, 720);
+            this.palGrapic1.TabIndex = 0;
             // 
             // FormGraphic
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
             this.ClientSize = new System.Drawing.Size(2560, 720);
+            this.Controls.Add(this.palGrapic1);
             this.DoubleBuffered = true;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
             this.Name = "FormGraphic";
             this.Text = "FormGraphic";
+            this.Load += new System.EventHandler(this.FormGraphic_Load);
             this.ResumeLayout(false);
 
         }
 
         #endregion
+        private System.Windows.Forms.Panel palGrapic1;
     }
 }

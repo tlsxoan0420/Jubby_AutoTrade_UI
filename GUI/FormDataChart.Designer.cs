@@ -28,10 +28,12 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.dgvChart1 = new System.Windows.Forms.DataGridView();
             this.dgvChart2 = new System.Windows.Forms.DataGridView();
             this.dgvChart3 = new System.Windows.Forms.DataGridView();
             this.dgvChart4 = new System.Windows.Forms.DataGridView();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
             ((System.ComponentModel.ISupportInitialize)(this.dgvChart1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvChart2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dgvChart3)).BeginInit();
@@ -82,6 +84,10 @@
             this.dgvChart4.Size = new System.Drawing.Size(1270, 290);
             this.dgvChart4.TabIndex = 3;
             // 
+            // timer1
+            // 
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
+            // 
             // FormDataChart
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
@@ -110,5 +116,6 @@
         private System.Windows.Forms.DataGridView dgvChart2;
         private System.Windows.Forms.DataGridView dgvChart3;
         private System.Windows.Forms.DataGridView dgvChart4;
+        public System.Windows.Forms.Timer timer1;
     }
 }

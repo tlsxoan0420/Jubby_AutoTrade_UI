@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Jubby_AutoTrade_UI.COMMON;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -7,7 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Jubby_AutoTrade_UI.COMMON;
+using static Jubby_AutoTrade_UI.COMMON.Flag;
 
 namespace Jubby_AutoTrade_UI.GUI
 {
@@ -159,7 +160,7 @@ namespace Jubby_AutoTrade_UI.GUI
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);              // 2. 종목명
                 AddColumn(dgv, "Ma_5", "단기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);       // 3. 단기 이동평균
                 AddColumn(dgv, "Ma_20", "장기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);      // 4. 장기 이동평균
-                AddColumn(dgv, "RIS", "RSI 지표", 60, DataGridViewContentAlignment.MiddleCenter);             // 5. RSI 지표
+                AddColumn(dgv, "RSI", "RSI 지표", 60, DataGridViewContentAlignment.MiddleCenter);             // 5. RSI 지표
                 AddColumn(dgv, "MACD", "MACD 지표", 60, DataGridViewContentAlignment.MiddleCenter);           // 6. MACD 지표
                 AddColumn(dgv, "Signal", "전략 신호", 60, DataGridViewContentAlignment.MiddleCenter);         // 7. 전략 신호 (매수 / 매도 / NONE)
             }
@@ -287,7 +288,7 @@ namespace Jubby_AutoTrade_UI.GUI
                 {
                     row.Cells["Ma_5"].Value = stock.Strategy.Ma_5.ToString("N6");                   // 1. 단기 이동평균
                     row.Cells["Ma_20"].Value = stock.Strategy.Ma_20.ToString("N6");                 // 2. 장기 이동평균
-                    row.Cells["RIS"].Value = stock.Strategy.RIS.ToString("N6");                     // 3. RSI 지표
+                    row.Cells["RSI"].Value = stock.Strategy.RSI.ToString("N6");                     // 3. RSI 지표
                     row.Cells["MACD"].Value = stock.Strategy.MACD.ToString("N6");                   // 4. MACD 지표
                     row.Cells["Signal"].Value = stock.Strategy.Signal;                              // 5. 전략 신호
 
@@ -366,6 +367,35 @@ namespace Jubby_AutoTrade_UI.GUI
         }
         #endregion ## Remove Chart Data ##
 
+        #region ## Apply Stock Update ##
+        internal void ApplyStockUpdate(JubbyStockInfo stock, UpdateTarget target)
+        {
+            // UI 스레드에서 실행
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => ApplyStockUpdate(stock, target)));
+                return;
+            }
+
+            // Market 데이터 → 표 0
+            if (target == UpdateTarget.Market || target == UpdateTarget.All)
+                UpdateData(0, stock, UpdateTarget.Market);
+
+            // Account 데이터 → 표 1
+            if (target == UpdateTarget.Account || target == UpdateTarget.All)
+                UpdateData(1, stock, UpdateTarget.Account);
+
+            // OrderHistory → 표 2
+            if (target == UpdateTarget.OrderHistory || target == UpdateTarget.All)
+                UpdateData(2, stock, UpdateTarget.OrderHistory);
+
+            // Strategy → 표 3
+            if (target == UpdateTarget.Strategy || target == UpdateTarget.All)
+                UpdateData(3, stock, UpdateTarget.Strategy);
+        }
+
+        #endregion ## Apply Stock Update ##
+
         #endregion ## Chart Event ##
 
         #region ## UI Event ##
@@ -405,6 +435,13 @@ namespace Jubby_AutoTrade_UI.GUI
             }
         }
         #endregion ## UI Event ##
+
+        #region ## Timer Event ##
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+
+        }
+        #endregion ## Timer Event ##
     }
 
     #region ## DataGridView Extension Method 깜빡임 방지 확장 메서드 ##

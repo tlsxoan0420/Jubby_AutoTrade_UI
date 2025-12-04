@@ -1,4 +1,5 @@
 ﻿using Jubby_AutoTrade_UI.GUI;
+using Jubby_AutoTrade_UI.SEQUENCE;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -418,11 +419,23 @@ namespace Jubby_AutoTrade_UI.COMMON
         public void ChangeMode(int mode)
         {
             Live.Runmode = mode;
-            if (mode == ModeNumber.Home) GetiReadyTime();
-            else if (mode == ModeNumber.Simul) GetiSimulOperationTime();
-            else if (mode == ModeNumber.Auto) GetiAutoOperationTime();
-            else if (mode == ModeNumber.Error) GetiErrorTime();
-
+            if (mode == ModeNumber.Home)
+            {
+                GetiReadyTime();
+            }
+            else if (mode == ModeNumber.Simul)
+            {
+                GetiSimulOperationTime();
+            }
+            else if (mode == ModeNumber.Auto)
+            {
+                GetiAutoOperationTime();
+                Auto.Ins.Run();
+            }
+            else if (mode == ModeNumber.Error)
+            {
+                GetiErrorTime();
+            }
             Live.FormChange = true;
         }
         #endregion ## ChangeMode ##

@@ -28,7 +28,9 @@
         /// </summary>
         private void InitializeComponent()
         {
+            this.components = new System.ComponentModel.Container();
             this.palGrapic1 = new System.Windows.Forms.Panel();
+            this.timer1 = new System.Windows.Forms.Timer(this.components);
             this.SuspendLayout();
             // 
             // palGrapic1
@@ -37,6 +39,10 @@
             this.palGrapic1.Name = "palGrapic1";
             this.palGrapic1.Size = new System.Drawing.Size(2560, 720);
             this.palGrapic1.TabIndex = 0;
+            // 
+            // timer1
+            // 
+            this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
             // 
             // FormGraphic
             // 
@@ -55,5 +61,6 @@
 
         #endregion
         private System.Windows.Forms.Panel palGrapic1;
+        public System.Windows.Forms.Timer timer1;
     }
 }

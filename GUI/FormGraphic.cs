@@ -1,4 +1,10 @@
-﻿using System;
+﻿using Jubby_AutoTrade_UI.COMMON;
+using Jubby_AutoTrade_UI.SEQUENCE;
+using ScottPlot;
+using ScottPlot.Finance;
+using ScottPlot.Plottables;
+using ScottPlot.WinForms;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -7,11 +13,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using ScottPlot;
-using ScottPlot.Plottables;
-using ScottPlot.WinForms;
-using ScottPlot.Finance;
-using Jubby_AutoTrade_UI.COMMON;
+using static Jubby_AutoTrade_UI.COMMON.Flag;
 
 namespace Jubby_AutoTrade_UI.GUI
 {
@@ -57,6 +59,7 @@ namespace Jubby_AutoTrade_UI.GUI
         // 너무 많은 봉을 그리면 렌더링이 느려지기 때문에 제한을 둔다.
         private const int MaxBars = 500;
 
+        private bool firstSetDone = false;
         #endregion ## FormGraphic Define ##
 
         public FormGraphic()
@@ -394,5 +397,47 @@ namespace Jubby_AutoTrade_UI.GUI
         }
 
         #endregion ## UI Event ##
+
+        #region ## Timer Event ##
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            // 아직 데이터가 아예 안 들어옴 → 아무것도 하지 않음
+            if (!Auto.Ins.DataManager.FirstDataReceived)
+                return;
+
+            // 데이터는 들어왔는데 최초 세팅 안함 → 여기서 최초 1회 실행
+            if (!firstSetDone)
+            {
+                firstSetDone = true;
+
+                string firstSymbol = Auto.Ins.DataManager.FirstSymbol;
+                var firstInfo = Auto.Ins.GetStock(firstSymbol);
+
+                if (firstInfo != null)
+                {
+                    SetStockList(new List<JubbyStockInfo> { firstInfo });
+                }
+
+                return; // 여기서 첫 루프 종료
+            }
+
+            if (StockList == null || StockList.Count == 0)
+                return;
+
+            if (CurrentIndex < 0 || CurrentIndex >= StockList.Count)
+                return;
+
+            // 현재 차트에 표시 중인 종목
+            string symbol = StockList[CurrentIndex].Symbol;
+
+            // 최신 종목 정보 가져오기
+            var info = Auto.Ins.GetStock(symbol);
+            if (info == null)
+                return;
+
+            // 차트 갱신
+            LoadChart(info);
+        }
+        #endregion ## Timer Event ##
     }
 }

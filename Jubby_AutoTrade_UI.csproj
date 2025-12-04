@@ -38,6 +38,9 @@
     <Reference Include="HarfBuzzSharp, Version=1.0.0.0, Culture=neutral, PublicKeyToken=0738eb9f132ed756, processorArchitecture=MSIL">
       <HintPath>packages\HarfBuzzSharp.8.3.1.2\lib\net462\HarfBuzzSharp.dll</HintPath>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>packages\Newtonsoft.Json.13.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
     <Reference Include="OpenTK, Version=3.1.0.0, Culture=neutral, PublicKeyToken=bad199fe84eb3df4, processorArchitecture=MSIL">
       <HintPath>packages\OpenTK.3.1.0\lib\net20\OpenTK.dll</HintPath>
     </Reference>
@@ -93,6 +96,7 @@
   <ItemGroup>
     <Compile Include="COMMON\Flag.cs" />
     <Compile Include="COMMON\Share.cs" />
+    <Compile Include="COM\TcpJsonServer.cs" />
     <Compile Include="GUI\FormDataChart.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -194,7 +198,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="COM\" />
     <Folder Include="DATABASE\" />
   </ItemGroup>
   <ItemGroup>

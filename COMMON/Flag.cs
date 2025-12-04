@@ -1,9 +1,12 @@
-﻿using System;
+﻿using Jubby_AutoTrade_UI.COM;
+using Jubby_AutoTrade_UI.GUI;
+using Jubby_AutoTrade_UI.SEQUENCE;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Jubby_AutoTrade_UI.GUI;
 
 namespace Jubby_AutoTrade_UI.COMMON
 {
@@ -83,7 +86,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             // 3-3. 주문내역([중요]'여러 개'일 수 있으므로 List로 관리해야 함)
 
             // [핵심] 리스트 보호를 위한 자물쇠 객체 (스레드 충돌 방지)
-            private readonly object _orderLock = new object();
+            private readonly object OrderLock = new object();
 
             public List<TradeOrderData> OrderHistory { get; set; } = new List<TradeOrderData>();
 
@@ -91,7 +94,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             public void AddOrder(TradeOrderData order)
             {
                 // lock: "내가 다 쓸 때까지 아무도 건드리지 마!" (안전장치)
-                lock (_orderLock)
+                lock (OrderLock)
                 {
                     OrderHistory.Add(order);
 
@@ -106,7 +109,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             // 3-3-2. 주문 삭제 함수 (Remove) - 주문번호(ID)로 삭제
             public void RemoveOrder(string orderID)
             {
-                lock (_orderLock)
+                lock (OrderLock)
                 {
                     // 람다식: "리스트 안에 있는 놈들 중에(x), ID가 orderID랑 똑같은 놈 다 지워라"
                     OrderHistory.RemoveAll(x => x.Order_Type == orderID);
@@ -116,7 +119,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             // 3-3-3. 주문 전체 삭제 (초기화)
             public void ClearOrders()
             {
-                lock (_orderLock)
+                lock (OrderLock)
                 {
                     OrderHistory.Clear();
                 }
@@ -125,7 +128,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             // 3-3-4. 안전하게 리스트 가져오기 (UI에서 그릴 때 복사본 전달)
             public List<TradeOrderData> GetOrderListSafe()
             {
-                lock (_orderLock)
+                lock (OrderLock)
                 {
                     // 원본을 주면 충돌나니까, 똑같은 리스트를 복사해서 줌 (ToList)
                     return OrderHistory.ToList();
@@ -143,6 +146,157 @@ namespace Jubby_AutoTrade_UI.COMMON
             }
         }
         #endregion ## Jubby Stock Info ##
+
+        #region ## Jubby Data Manager ##
+        ///  MESSAGE → JUBBYSTOCKINFO APPLY LOGIC (핵심 부분)
+        public class JubbyDataManager
+        {
+            /// 종목별 저장소
+            private Dictionary<string, JubbyStockInfo> _stocks = new Dictionary<string, JubbyStockInfo>();
+
+            /// JSON MESSAGE 처리 → JubbyStockInfo 업데이트
+            public void HandleMessage(JsonMessage msg)
+            {
+                // heartbeat는 무시
+                if (msg.MsgType.Equals("heartbeat", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // msg_type → UpdateTarget 매핑
+                if (!Enum.TryParse<UpdateTarget>(msg.MsgType, true, out UpdateTarget target))
+                {
+                    Console.WriteLine($"[ERROR] Unknown msg_type : {msg.MsgType}");
+                    return;
+                }
+
+                // symbol 필드 확인
+                string symbol = msg.Payload["symbol"]?.ToString();
+                if (string.IsNullOrEmpty(symbol))
+                {
+                    Console.WriteLine("[ERROR] payload.symbol 없음");
+                    return;
+                }
+
+                // 필수: 종목명(name)
+                string name = msg.Payload["name"]?.ToString();
+                if (string.IsNullOrEmpty(name))
+                {
+                    Console.WriteLine("[ERROR] payload.name 없음");
+                    return;
+                }
+
+                // 종목 찾기 OR 새로 만들기
+                if (!_stocks.TryGetValue(symbol, out JubbyStockInfo info))
+                {
+                    // ★ 여기 수정됨: name 을 반드시 저장
+                    info = new JubbyStockInfo(symbol, name);
+                    _stocks[symbol] = info;
+                }
+                else
+                {
+                    // 이미 존재하더라도 name 변경 가능하도록 갱신해줌 (중요)
+                    info.Name = name;
+                }
+                // 업데이트 적용
+                ApplyUpdate(info, target, msg.Payload);
+
+                // UI 테이블 업데이트
+                Auto.Ins.formDataChart?.ApplyStockUpdate(info, target);
+            }
+
+            // APPLY UPDATE TARGET
+            private void ApplyUpdate(JubbyStockInfo info, UpdateTarget target, JToken p)
+            {
+                switch (target)
+                {
+                    case UpdateTarget.Market:
+                        ApplyMarket(info.Market, p);
+                        break;
+
+                    case UpdateTarget.Account:
+                        ApplyAccount(info.MyAccount, p);
+                        break;
+
+                    case UpdateTarget.OrderHistory:
+                        ApplyOrder(info, p);
+                        break;
+
+                    case UpdateTarget.Strategy:
+                        ApplyStrategy(info.Strategy, p);
+                        break;
+
+                    case UpdateTarget.All:
+                        if (p["market"] != null) ApplyMarket(info.Market, p["market"]);
+                        if (p["account"] != null) ApplyAccount(info.MyAccount, p["account"]);
+                        if (p["order"] != null) ApplyOrder(info, p["order"]);
+                        if (p["strategy"] != null) ApplyStrategy(info.Strategy, p["strategy"]);
+                        break;
+                }
+            }
+
+            private void ApplyMarket(TradeMarketData m, JToken p)
+            {
+                m.Last_Price = p["last_price"]?.Value<decimal>() ?? m.Last_Price;
+                m.Open_Price = p["open_price"]?.Value<decimal>() ?? m.Open_Price;
+                m.High_Price = p["high_price"]?.Value<decimal>() ?? m.High_Price;
+                m.Low_Price = p["low_price"]?.Value<decimal>() ?? m.Low_Price;
+
+                m.Bid_Price = p["bid_price"]?.Value<decimal>() ?? m.Bid_Price;
+                m.Ask_Price = p["ask_price"]?.Value<decimal>() ?? m.Ask_Price;
+
+                m.Bid_Size = p["bid_size"]?.Value<decimal>() ?? m.Bid_Size;
+                m.Ask_Size = p["ask_size"]?.Value<decimal>() ?? m.Ask_Size;
+
+                m.Volume = p["volume"]?.Value<decimal>() ?? m.Volume;
+            }
+
+            private void ApplyAccount(TradeAccountData acc, JToken p)
+            {
+                acc.Quantity = p["quantity"]?.Value<decimal>() ?? acc.Quantity;
+                acc.Avg_Price = p["avg_price"]?.Value<decimal>() ?? acc.Avg_Price;
+                acc.Pnl = p["pnl"]?.Value<decimal>() ?? acc.Pnl;
+                acc.Available_Cash = p["available_cash"]?.Value<decimal>() ?? acc.Available_Cash;
+            }
+
+            private void ApplyOrder(JubbyStockInfo info, JToken p)
+            {
+                TradeOrderData o = new TradeOrderData
+                {
+                    Order_Type = p["order_type"]?.ToString(),
+                    Order_Price = p["order_price"]?.Value<decimal>() ?? 0,
+                    Order_Quantity = p["order_quantity"]?.Value<decimal>() ?? 0,
+                    Filled_Quqntity = p["filled_quantity"]?.Value<decimal>() ?? 0,
+                    Order_Time = p["order_time"]?.ToString(),
+                    Status = p["Status"]?.ToString(),
+                };
+
+                info.AddOrder(o);
+            }
+
+            private void ApplyStrategy(TradeStrategyData s, JToken p)
+            {
+                s.Ma_5 = p["ma_5"]?.Value<decimal>() ?? s.Ma_5;
+                s.Ma_20 = p["ma_20"]?.Value<decimal>() ?? s.Ma_20;
+                s.RSI = p["RSI"]?.Value<decimal>() ?? s.RSI;
+                s.MACD = p["macd"]?.Value<decimal>() ?? s.MACD;
+                s.Signal = p["signal"]?.ToString() ?? s.Signal;
+            }
+
+            public string FirstSymbol { get; private set; } = null;
+            public bool FirstDataReceived => FirstSymbol != null;
+
+            public JubbyStockInfo GetStock(string symbol)
+            {
+                if (_stocks == null)
+                    return null;
+
+                if (_stocks.TryGetValue(symbol, out JubbyStockInfo info))
+                    return info;
+
+                return null;
+            }
+        }
+
+        #endregion ## Jubby Data Manager ##
 
         #region ## Trade Data ##
 
@@ -185,7 +339,7 @@ namespace Jubby_AutoTrade_UI.COMMON
         {
             public decimal Ma_5 { get; set; }                  // 1. 단기 이동평균
             public decimal Ma_20 { get; set; }                 // 2. 장기 이동평균
-            public decimal RIS { get; set; }                   // 3. RSI 지표
+            public decimal RSI { get; set; }                   // 3. RSI 지표
             public decimal MACD { get; set; }                  // 4. MACD 지표
             public string Signal { get; set; }                // 5. 전략 신호 (매수 / 매도 / NONE)
         }

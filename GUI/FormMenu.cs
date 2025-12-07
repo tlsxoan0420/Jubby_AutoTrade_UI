@@ -15,6 +15,7 @@ namespace Jubby_AutoTrade_UI.GUI
     {
         #region ## FormMenu Define ##
         private Button[] btnMenuArray;
+
         #endregion ## FormMenu Define ##
 
         public FormMenu()
@@ -226,7 +227,11 @@ namespace Jubby_AutoTrade_UI.GUI
                 labOperationText.Visible = false;
                 labOperationText.ForeColor = Color.Silver;
             }
-            else if(Flag.Live.Runmode <= Flag.ModeNumber.Home)
+            else if(Flag.Live.Runmode == Flag.ModeNumber.Hide)
+            {
+
+            }
+            else if (Flag.Live.Runmode == Flag.ModeNumber.Home)
             {
                 labOperationText.Visible = true;
                 labOperationText.Text = "🔵 대기 모드";
@@ -245,7 +250,7 @@ namespace Jubby_AutoTrade_UI.GUI
 
                 labOperationText.Text = "🔴 자동 매매 모드";
             }
-            else if( Flag.Live.Runmode == Flag.ModeNumber.Error)
+            else if (Flag.Live.Runmode == Flag.ModeNumber.Error)
             {
                 labOperationText.Visible = true;
                 labOperationText.ForeColor = Color.Red;

@@ -56,6 +56,11 @@ namespace Jubby_AutoTrade_UI.GUI
                 dgvChartArray[i].CellClick -= DgvChart_CellClick;
                 dgvChartArray[i].CellClick += DgvChart_CellClick;
             }
+
+            for (int i = 0; i < dgvChartArray.Length; i++)
+            {
+                SetGridStyle(dgvChartArray[i], i);
+            }
         }
         #endregion ## UI Organize ##
 
@@ -69,10 +74,7 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## UI Update ##
         public void UIUpdate()
         {
-            for (int i = 0; i < dgvChartArray.Length; i++)
-            {
-                SetGridStyle(dgvChartArray[i], i);
-            }
+
         }
         #endregion ## UI Update ##
 
@@ -115,7 +117,7 @@ namespace Jubby_AutoTrade_UI.GUI
             // (이미 컬럼이 있다면 중복 추가 방지)
             if (dgv.Columns.Count == 0 && Chart == 0) // 1. 시세 정보 데이터
             {
-                AddColumn(dgv, "NO", "번호", 40, DataGridViewContentAlignment.MiddleCenter);              // 0. 번호
+                AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);              // 0. 번호
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);      // 1. 종목코드
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);          // 2. 종목명
                 AddColumn(dgv, "Last_Price", "현재가", 60, DataGridViewContentAlignment.MiddleCenter);    // 3. 현재가
@@ -131,7 +133,7 @@ namespace Jubby_AutoTrade_UI.GUI
             }
             else if (dgv.Columns.Count == 0 && Chart == 1) // 2. 내 잔고 정보 데이터
             {
-                AddColumn(dgv, "NO", "번호", 40, DataGridViewContentAlignment.MiddleCenter);                        // 0. 번호
+                AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);                        // 0. 번호
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);                // 1. 종목코드
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);                    // 2. 종목명
                 AddColumn(dgv, "Quantity", "보유수량", 60, DataGridViewContentAlignment.MiddleCenter);              // 3. 보유수량
@@ -142,10 +144,10 @@ namespace Jubby_AutoTrade_UI.GUI
             }
             else if (dgv.Columns.Count == 0 && Chart == 2) // 3. 전략 분석 정보 데이터
             {
-                AddColumn(dgv, "NO", "번호", 40, DataGridViewContentAlignment.MiddleCenter);                  // 0. 번호
+                AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);                  // 0. 번호
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);          // 1. 종목코드
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);              // 2. 종목명
-                AddColumn(dgv, "Order_Trype", "주문종류", 60, DataGridViewContentAlignment.MiddleCenter);     // 3. 주문종류
+                AddColumn(dgv, "Order_Type", "주문종류", 60, DataGridViewContentAlignment.MiddleCenter);     // 3. 주문종류
                 AddColumn(dgv, "Order_Price", "주문가격", 60, DataGridViewContentAlignment.MiddleCenter);     // 4. 주문가격
                 AddColumn(dgv, "Order_Quantity", "주문수량", 60, DataGridViewContentAlignment.MiddleCenter);  // 5. 주문수량
                 AddColumn(dgv, "Filled_Quqntity", "체결수량", 60, DataGridViewContentAlignment.MiddleCenter); // 6. 체결수량
@@ -155,7 +157,7 @@ namespace Jubby_AutoTrade_UI.GUI
             }
             else if (dgv.Columns.Count == 0 && Chart == 3) // 4. 주문내역 데이터
             {
-                AddColumn(dgv, "NO", "번호", 40, DataGridViewContentAlignment.MiddleCenter);                  // 0. 번호
+                AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);                  // 0. 번호
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);          // 1. 종목코드
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);              // 2. 종목명
                 AddColumn(dgv, "Ma_5", "단기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);       // 3. 단기 이동평균
@@ -195,11 +197,12 @@ namespace Jubby_AutoTrade_UI.GUI
             }
 
             // 3. 데이터 갱신 로직
-            if (targetMap.ContainsKey(stock.Symbol) & target != Flag.UpdateTarget.OrderHistory)
+            if (targetMap.ContainsKey(stock.Symbol) && target != Flag.UpdateTarget.OrderHistory)
             {
                 // [A] 이미 있는 종목 -> 값만 변경 (업데이트)
                 DataGridViewRow row = targetMap[stock.Symbol];
                 SetRowValues(row, stock, target);
+                targetGrid.Refresh();
             }
             else
             {
@@ -219,6 +222,7 @@ namespace Jubby_AutoTrade_UI.GUI
                 row.Cells["Name"].Value = stock.Name;
 
                 SetRowValues(row, stock, target);
+                targetGrid.Refresh();
             }
         }
 
@@ -341,7 +345,7 @@ namespace Jubby_AutoTrade_UI.GUI
                         // 2. 행(Row)의 뒷주머니(Tag)에서 원본 객체(stock) 꺼내기
                         if (row.Tag is Flag.JubbyStockInfo stock)
                         {
-                            // 3. 실제 객체에게 삭제 명령 (클래스명X -> 변수명O)
+                            // 3. 실제 객체에게 삭제 명령 (클래스명X -SetGridStyle> 변수명O)
                             // ★주의: RemoveOrder 안에는 "주문번호(ID)"가 들어가야 합니다.
                             // (만약 파라미터 symbol에 주문번호를 담아 오셨다면 이대로 쓰세요)
                             stock.RemoveOrder(symbol);

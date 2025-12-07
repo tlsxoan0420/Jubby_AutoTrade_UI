@@ -35,17 +35,13 @@ namespace Jubby_AutoTrade_UI.COMMON
             public static int iAutoOperationTime = 0;
             public static int iAutoOperationPuaseTime = 0;
             public static int iErrorTime = 0;
+            public static int OldFormMode = 0;
 
             public static bool IsLogin = false;
-
             public static bool FormChange = false;
-
             public static bool IsMessageOkClick = false;
-
             public static bool ErrorClearSuccess = false;
-
             public static bool IsDataChartUpdate = false;
-
             public static bool IsCommunication = false;
         }
         #endregion ## Live ##
@@ -177,7 +173,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                 }
 
                 // 필수: 종목명(name)
-                string name = msg.Payload["name"]?.ToString();
+                string name = msg.Payload["symbol_name"]?.ToString();
                 if (string.IsNullOrEmpty(name))
                 {
                     Console.WriteLine("[ERROR] payload.name 없음");
@@ -350,10 +346,11 @@ namespace Jubby_AutoTrade_UI.COMMON
         public class ModeNumber
         {
             public const int Logout = 0;
-            public const int Home = 1;
-            public const int Simul = 2;
-            public const int Auto = 3;
-            public const int Error = 4;
+            public const int Hide = 5;
+            public const int Home = 10;
+            public const int Simul = 20;
+            public const int Auto = 30;
+            public const int Error = 40;
         }
         #endregion ## Mode Number ##
 
@@ -365,15 +362,5 @@ namespace Jubby_AutoTrade_UI.COMMON
             public const int MASTER = 2;
         }
         #endregion ## User Level ##
-
-        #region ## Page Number ##
-        public class PageNumber
-        {
-            public const int FORM_LOGOUT = 0;
-            public const int FORM_HOME = 1;
-            public const int FORM_AUTO = 2;
-            public const int FORM_ERROR = 3;
-        }
-        #endregion ## Page Number ##
     }
 }

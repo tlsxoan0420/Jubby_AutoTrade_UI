@@ -62,7 +62,7 @@ namespace Jubby_AutoTrade_UI.COMMON
         {
             Market,             // 1. 시세만 (Market)
             Account,            // 2. 내 잔고만 (MyAccount)
-            OrderHistory,       // 3. 주문내역만 (OrderHistory)
+            Order,       // 3. 주문내역만 (OrderHistory)
             Strategy,           // 4. 전략 신호만 (Strategy)
             All,                // 5. 전체 (All)
         }
@@ -196,7 +196,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                 ApplyUpdate(info, target, msg.Payload);
 
                 // UI 테이블 업데이트
-                Auto.Ins.formDataChart?.ApplyStockUpdate(info, target);
+                Auto.Ins.formDataChart?.SafeApplyStockUpdate(info, target);
             }
 
             // APPLY UPDATE TARGET
@@ -212,7 +212,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                         ApplyAccount(info.MyAccount, p);
                         break;
 
-                    case UpdateTarget.OrderHistory:
+                    case UpdateTarget.Order:
                         ApplyOrder(info, p);
                         break;
 

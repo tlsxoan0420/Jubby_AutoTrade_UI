@@ -50,6 +50,7 @@
             this.dgvChart1.RowTemplate.Height = 23;
             this.dgvChart1.Size = new System.Drawing.Size(1270, 290);
             this.dgvChart1.TabIndex = 0;
+            this.dgvChart1.DoubleClick += new System.EventHandler(this.dgvChart1_DoubleClick);
             // 
             // dgvChart2
             // 

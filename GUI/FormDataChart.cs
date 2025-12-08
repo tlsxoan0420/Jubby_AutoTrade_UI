@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Text;
@@ -35,8 +36,6 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## UI Organize ##
         public void UIOrganize()
         {
-            formGraphic = new FormGraphic();
-
             dgvChartArray = new DataGridView[]
             {
                 dgvChart1,
@@ -60,6 +59,7 @@ namespace Jubby_AutoTrade_UI.GUI
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
                 SetGridStyle(dgvChartArray[i], i);
+                dgvChartArray[i].AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             }
         }
         #endregion ## UI Organize ##
@@ -168,7 +168,7 @@ namespace Jubby_AutoTrade_UI.GUI
             }
 
             // 컬럼 자동 채우기
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            //dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         }
 
         // 컬럼 추가 헬퍼 (어느 그리드에 추가할지 dgv 파라미터 받음)
@@ -197,7 +197,7 @@ namespace Jubby_AutoTrade_UI.GUI
             }
 
             // 3. 데이터 갱신 로직
-            if (targetMap.ContainsKey(stock.Symbol) && target != Flag.UpdateTarget.OrderHistory)
+            if (targetMap.ContainsKey(stock.Symbol))
             {
                 // [A] 이미 있는 종목 -> 값만 변경 (업데이트)
                 DataGridViewRow row = targetMap[stock.Symbol];
@@ -221,7 +221,12 @@ namespace Jubby_AutoTrade_UI.GUI
                 row.Cells["Symbol"].Value = stock.Symbol;
                 row.Cells["Name"].Value = stock.Name;
 
+                foreach (DataGridViewColumn col in row.DataGridView.Columns)
+                {
+                    Debug.WriteLine($"COL: {col.Name}");
+                }
                 SetRowValues(row, stock, target);
+                Debug.WriteLine($"RowIndex = {row.Index}, Symbol = {stock.Symbol}");
                 targetGrid.Refresh();
             }
         }
@@ -233,24 +238,21 @@ namespace Jubby_AutoTrade_UI.GUI
             // 1. [Market] 시세 데이터 업데이트
             if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Market)
             {
-                if (stock.Market != null)
-                {
-                    row.Cells["Last_Price"].Value = stock.Market.Last_Price.ToString("N6");     // 1. 현재가
-                    row.Cells["Open_Price"].Value = stock.Market.Open_Price.ToString("N6");     // 2. 시가
-                    row.Cells["High_Price"].Value = stock.Market.High_Price.ToString("N6");     // 3. 고가
-                    row.Cells["Low_Price"].Value = stock.Market.Low_Price.ToString("N6");       // 4. 저가
-                    row.Cells["Bid_Price"].Value = stock.Market.Bid_Price.ToString("N6");       // 5. 매수호가
-                    row.Cells["Ask_Price"].Value = stock.Market.Ask_Price.ToString("N6");       // 6. 매도호가
-                    row.Cells["Bid_Size"].Value = stock.Market.Bid_Size.ToString("N6");         // 7. 매수잔량
-                    row.Cells["Ask_Size"].Value = stock.Market.Ask_Size.ToString("N6");         // 8. 매도잔량
-                    row.Cells["Volume"].Value = stock.Market.Volume.ToString("N6");             // 9. 거래량
+                row.Cells["Last_Price"].Value = stock.Market.Last_Price.ToString("N6");     // 1. 현재가
+                row.Cells["Open_Price"].Value = stock.Market.Open_Price.ToString("N6");     // 2. 시가
+                row.Cells["High_Price"].Value = stock.Market.High_Price.ToString("N6");     // 3. 고가
+                row.Cells["Low_Price"].Value = stock.Market.Low_Price.ToString("N6");       // 4. 저가
+                row.Cells["Bid_Price"].Value = stock.Market.Bid_Price.ToString("N6");       // 5. 매수호가
+                row.Cells["Ask_Price"].Value = stock.Market.Ask_Price.ToString("N6");       // 6. 매도호가
+                row.Cells["Bid_Size"].Value = stock.Market.Bid_Size.ToString("N6");         // 7. 매수잔량
+                row.Cells["Ask_Size"].Value = stock.Market.Ask_Size.ToString("N6");         // 8. 매도잔량
+                row.Cells["Volume"].Value = stock.Market.Volume.ToString("N6");             // 9. 거래량
 
-                    // 금액에 따른 색상 처리 추가 예정
-                    //Color color = stock.Market.Change_Rate > 0 ? Color.Red :
-                    //              (stock.Market.Change_Rate < 0 ? Color.Blue : Color.WhiteSmoke);
-                    //row.Cells["Price"].Style.ForeColor = color;
-                    //row.Cells["Rate"].Style.ForeColor = color;
-                }
+                // 금액에 따른 색상 처리 추가 예정
+                //Color color = stock.Market.Change_Rate > 0 ? Color.Red :
+                //              (stock.Market.Change_Rate < 0 ? Color.Blue : Color.WhiteSmoke);
+                //row.Cells["Price"].Style.ForeColor = color;
+                //row.Cells["Rate"].Style.ForeColor = color;
             }
 
             // 2. [Account] 잔고 데이터 업데이트
@@ -264,7 +266,7 @@ namespace Jubby_AutoTrade_UI.GUI
             }
 
             // 3. [Strategy] 전략 분석 정보 데이터 업데이트
-            if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.OrderHistory)
+            if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Order)
             {
                 // 리스트가 존재하고 데이터가 하나라도 있어야 함
                 // OrderHistory는 List이므로 바로 .Status 접근 불가 -> 가장 최근 것(.Last) 하나만 가져옴
@@ -335,7 +337,7 @@ namespace Jubby_AutoTrade_UI.GUI
                 // (3) 검색 지도(Dictionary)에서도 제거 (★중요: 이거 안 하면 나중에 에러 남)
                 targetMap.Remove(symbol);
                 // [조건] 타겟이 '주문내역(OrderHistory)' 삭제인 경우
-                if (target == Flag.UpdateTarget.OrderHistory)
+                if (target == Flag.UpdateTarget.Order)
                 {
                     // 1. 해당 종목이 존재하는지 확인 (몇 번째 표인지 targetIndex 필요)
                     if (ChartrowMaps[targetIndex].ContainsKey(symbol))
@@ -390,8 +392,8 @@ namespace Jubby_AutoTrade_UI.GUI
                 UpdateData(1, stock, UpdateTarget.Account);
 
             // OrderHistory → 표 2
-            if (target == UpdateTarget.OrderHistory || target == UpdateTarget.All)
-                UpdateData(2, stock, UpdateTarget.OrderHistory);
+            if (target == UpdateTarget.Order || target == UpdateTarget.All)
+                UpdateData(2, stock, UpdateTarget.Order);
 
             // Strategy → 표 3
             if (target == UpdateTarget.Strategy || target == UpdateTarget.All)
@@ -399,6 +401,20 @@ namespace Jubby_AutoTrade_UI.GUI
         }
 
         #endregion ## Apply Stock Update ##
+
+        internal void SafeApplyStockUpdate(JubbyStockInfo stock, UpdateTarget target)
+        {
+            if (this.IsDisposed) return; // 폼이 이미 닫혔으면 무시
+
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => ApplyStockUpdate(stock, target)));
+            }
+            else
+            {
+                ApplyStockUpdate(stock, target);
+            }
+        }
 
         #endregion ## Chart Event ##
 
@@ -446,6 +462,23 @@ namespace Jubby_AutoTrade_UI.GUI
 
         }
         #endregion ## Timer Event ##
+
+        private void dgvChart1_DoubleClick(object sender, EventArgs e)
+        {
+            Random rnd = new Random();
+            var stock = new JubbyStockInfo(rnd.NextDouble().ToString(), "TestData");
+
+            stock.Market.Last_Price = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Open_Price = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.High_Price = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Low_Price = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Bid_Price = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Ask_Price = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Bid_Size = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Ask_Size = (decimal)rnd.NextDouble() * 1000;
+            stock.Market.Volume = (decimal)rnd.NextDouble() * 1000;
+            UpdateData(0, stock, Flag.UpdateTarget.Market);
+        }
     }
 
     #region ## DataGridView Extension Method 깜빡임 방지 확장 메서드 ##

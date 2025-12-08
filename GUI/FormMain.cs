@@ -1,5 +1,4 @@
 ﻿
-using Jubby_AutoTrade_UI.COMMON;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -10,15 +9,14 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static Jubby_AutoTrade_UI.COMMON.Flag;
+using Jubby_AutoTrade_UI.COMMON;
+using Jubby_AutoTrade_UI.SEQUENCE;
 
 namespace Jubby_AutoTrade_UI.GUI
 {
     public partial class FormMain : Form
     {
         #region ## FormMain Define ##
-        private FormDataChart formnDataChart = new FormDataChart();
-        private FormGraphic formGraphic = new FormGraphic();
         private FormMenu formMenu = new FormMenu();
         private FormStatus formStatus = new FormStatus();
 
@@ -57,8 +55,8 @@ namespace Jubby_AutoTrade_UI.GUI
 
             EnableDrag(PalMainArray[0]);
             EnableDrag(formMenu);   // ★ 추가: child form도 드래그 가능
-            EnableDrag(formGraphic);
-            EnableDrag(formnDataChart);
+            EnableDrag(Auto.Ins.formGraphic);
+            EnableDrag(Auto.Ins.formDataChart);
             EnableDrag(formStatus);
         }
         #endregion ## UI Organize ##
@@ -258,15 +256,15 @@ namespace Jubby_AutoTrade_UI.GUI
                 formMenu.TopLevel = false;
                 formMenu.TopMost = false;
 
-                formGraphic.Location = new Point(0, 0);
-                formGraphic.Size = new Size(PalMainArray[1].Width, PalMainArray[1].Height);
-                formGraphic.TopLevel = false;
-                formGraphic.TopMost = false;
+                Auto.Ins.formGraphic.Location = new Point(0, 0);
+                Auto.Ins.formGraphic.Size = new Size(PalMainArray[1].Width, PalMainArray[1].Height);
+                Auto.Ins.formGraphic.TopLevel = false;
+                Auto.Ins.formGraphic.TopMost = false;
 
-                formnDataChart.Location = new Point(0, 0);
-                formnDataChart.Size = new Size(PalMainArray[2].Width, PalMainArray[2].Height);
-                formnDataChart.TopLevel = false;
-                formnDataChart.TopMost = false;
+                Auto.Ins.formDataChart.Location = new Point(0, 0);
+                Auto.Ins.formDataChart.Size = new Size(PalMainArray[2].Width, PalMainArray[2].Height);
+                Auto.Ins.formDataChart.TopLevel = false;
+                Auto.Ins.formDataChart.TopMost = false;
 
                 formStatus.Location = new Point(0, 0);
                 formStatus.Size = new Size(PalMainArray[3].Width, PalMainArray[3].Height);
@@ -282,12 +280,12 @@ namespace Jubby_AutoTrade_UI.GUI
                 PalMainArray[1].Visible = true;
                 PalMainArray[1].Location = new Point(0, 60);
                 PalMainArray[1].Size = new Size(2560, 720);
-                PalMainArray[1].Controls.Add(formGraphic);
+                PalMainArray[1].Controls.Add(Auto.Ins.formGraphic);
 
                 PalMainArray[2].Visible = true;
                 PalMainArray[2].Location = new Point(0, 780);
                 PalMainArray[2].Size = new Size(2560, 600);
-                PalMainArray[2].Controls.Add(formnDataChart);
+                PalMainArray[2].Controls.Add(Auto.Ins.formDataChart);
 
                 PalMainArray[3].Visible = true;
                 PalMainArray[3].Location = new Point(0, 1380);
@@ -296,8 +294,8 @@ namespace Jubby_AutoTrade_UI.GUI
                 PalMainArray[3].Dock = DockStyle.Bottom;
             }
 
-            formGraphic.Hide();
-            formnDataChart.Hide();
+            Auto.Ins.formGraphic.Hide();
+            Auto.Ins.formDataChart.Hide();
             formStatus.Hide();
             Flag.Live.OldFormMode = frame;
 
@@ -319,20 +317,20 @@ namespace Jubby_AutoTrade_UI.GUI
                     break;
 
                 case Flag.ModeNumber.Home:
-                    formGraphic.Show();
-                    formnDataChart.Show();
+                    Auto.Ins.formGraphic.Show();
+                    Auto.Ins.formDataChart.Show();
                     formStatus.Show();
                     break;
 
                 case Flag.ModeNumber.Simul:
-                    formGraphic.Show();
-                    formnDataChart.Show();
+                    Auto.Ins.formGraphic.Show();
+                    Auto.Ins.formDataChart.Show();
                     formStatus.Show();
                     break;
 
                 case Flag.ModeNumber.Auto:
-                    formGraphic.Show();
-                    formnDataChart.Show();
+                    Auto.Ins.formGraphic.Show();
+                    Auto.Ins.formDataChart.Show();
                     formStatus.Show();
                     break;
 

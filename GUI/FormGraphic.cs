@@ -54,6 +54,9 @@ namespace Jubby_AutoTrade_UI.GUI
         private const int MaxBars = 500;
 
         private bool firstSetDone = false;
+
+        private bool isFirstScale = true;
+        private bool isDataUpdated = false; // 화면을 다시 그릴지 결정하는 신호등
         #endregion ## FormGraphic Define ##
 
         public FormGraphic()
@@ -223,9 +226,10 @@ namespace Jubby_AutoTrade_UI.GUI
 
             // [수정] 무조건 스케일을 초기화하는 게 아니라,
             // 데이터가 처음 들어왔을 때(빈 차트일 때) 딱 한 번만 카메라 초점을 맞춰줍니다.
-            if (beforeCount == 0)
+            if (isFirstScale)
             {
                 FormsPlotMain.Plot.Axes.AutoScale();
+                isFirstScale = false; // 한 번 맞춘 후에는 스위치를 꺼서 펄쩍 뛰지 않게 방지
             }
 
             /// 실제 화면 다시 그리기
@@ -399,6 +403,38 @@ namespace Jubby_AutoTrade_UI.GUI
         }
         #endregion ## Update Order Markers ##
 
+        #region ## Update Market Data (새 데이터 수신 시 호출) ##
+        // [새로 추가된 함수] Python에서 진짜 새 데이터가 왔을 때만 실행됩니다.
+        internal void UpdateMarketData(Flag.JubbyStockInfo info)
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => UpdateMarketData(info)));
+                return;
+            }
+
+            if (!ChartInitialized) InitChart();
+
+            // 다른 종목을 보고 있다면 무시
+            if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count) return;
+            if (StockList[CurrentIndex].Symbol != info.Symbol) return;
+
+            // 1. 데이터 업데이트
+            AppendOHLCFromMarket(info.Market);
+            UpdateOrderMarkers(info.GetOrderListSafe());
+
+            // 2. [핵심] 가격이 0원이 아닐 때(진짜 데이터일 때)만 최초 1회 카메라 줌인!
+            if (isFirstScale && info.Market.Last_Price > 0)
+            {
+                FormsPlotMain.Plot.Axes.AutoScale();
+                isFirstScale = false;
+            }
+
+            // 3. 차트를 다시 그리라고 타이머에게 신호만 줌 (여기서 직접 Refresh 안 함 = 튕김 방지)
+            isDataUpdated = true;
+        }
+        #endregion
+
         #endregion ## Graphic Event ##
 
         #region ## UI Event ##
@@ -450,11 +486,11 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## Timer Event ##
         private void timer1_Tick(object sender, EventArgs e)
         {
-            // 아직 데이터가 아예 안 들어옴 → 아무것도 하지 않음
+            // 1. 아직 데이터가 아예 안 들어옴 → 아무것도 하지 않음
             if (!Auto.Ins.DataManager.FirstDataReceived)
                 return;
 
-            // 데이터는 들어왔는데 최초 세팅 안함 → 여기서 최초 1회 실행
+            // 2. 데이터는 들어왔는데 최초 세팅 안함 → 여기서 최초 1회 실행
             if (!firstSetDone)
             {
                 firstSetDone = true;
@@ -464,28 +500,23 @@ namespace Jubby_AutoTrade_UI.GUI
 
                 if (firstInfo != null)
                 {
-                    SetStockList(new List<JubbyStockInfo> { firstInfo });
+                    // 첫 종목을 리스트에 넣고 화면에 한 번 세팅해 줍니다.
+                    SetStockList(new List<Flag.JubbyStockInfo> { firstInfo });
                 }
 
                 return; // 여기서 첫 루프 종료
             }
 
-            if (StockList == null || StockList.Count == 0)
-                return;
-
-            if (CurrentIndex < 0 || CurrentIndex >= StockList.Count)
-                return;
-
-            // 현재 차트에 표시 중인 종목
-            string symbol = StockList[CurrentIndex].Symbol;
-
-            // 최신 종목 정보 가져오기
-            var info = Auto.Ins.GetStock(symbol);
-            if (info == null)
-                return;
-
-            // 차트 갱신
-            LoadChart(info);
+            // =======================================================
+            // 3. [핵심] 차트 새로고침 (가벼운 렌더링)
+            // =======================================================
+            // 이전처럼 LoadChart를 0.1초마다 무식하게 계속 부르면 프로그램이 과부하 걸립니다.
+            // UpdateMarketData()에서 새 데이터를 넣고 "isDataUpdated = true" 신호를 주었을 때만 화면을 그립니다!
+            if (isDataUpdated)
+            {
+                FormsPlotMain.Refresh();
+                isDataUpdated = false; // 다 그렸으니 신호등 끄기
+            }
         }
         #endregion ## Timer Event ##
     }

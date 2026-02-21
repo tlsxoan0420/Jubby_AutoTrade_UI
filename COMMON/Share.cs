@@ -417,6 +417,12 @@ namespace Jubby_AutoTrade_UI.COMMON
         #region ## ChangeMode ##
         public void ChangeMode(int mode)
         {
+            // [추가] 다른 모드로 변경 시 기존에 켜져 있던 Auto(서버)를 확실히 중지시킴
+            if (Live.Runmode == ModeNumber.Auto && mode != ModeNumber.Auto)
+            {
+                Auto.Ins.Stop();
+            }
+
             Live.Runmode = mode;
             if (mode == ModeNumber.Home)
             {

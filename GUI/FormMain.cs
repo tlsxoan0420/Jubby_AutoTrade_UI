@@ -164,14 +164,15 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## EnableDrag ##
         private void EnableDrag(Control parent)
         {
-            // 버튼류, 입력 컨트롤은 드래그에서 제외
+            // [수정] 차트(FormsPlot) 영역에서는 창 드래그 기능이 안 먹히게 예외 처리 추가!
             if (parent is Button ||
                 parent is TextBox ||
                 parent is ComboBox ||
                 parent is CheckBox ||
                 parent is RadioButton ||
                 parent is ListView ||
-                parent is DataGridView)
+                parent is DataGridView ||
+                parent.GetType().Name == "FormsPlot") // <--- 이 줄을 꼭 추가하세요!
             {
                 return;
             }
@@ -179,11 +180,9 @@ namespace Jubby_AutoTrade_UI.GUI
             parent.MouseDown += PanelMoveDownEvent;
             parent.MouseMove += PanelMouseMoveEvent;
 
-            // child controls 재귀 처리
             foreach (Control c in parent.Controls)
                 EnableDrag(c);
 
-            // Form일 경우에도 재귀적으로 적용
             if (parent is Form f)
             {
                 foreach (Control c in f.Controls)
@@ -191,7 +190,6 @@ namespace Jubby_AutoTrade_UI.GUI
             }
         }
         #endregion ## EnableDrag ##
-
         #region ## Form Change ##
         public void FormChange(int frame)
         {

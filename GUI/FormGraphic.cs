@@ -1,17 +1,11 @@
 ﻿using Jubby_AutoTrade_UI.COMMON;
 using Jubby_AutoTrade_UI.SEQUENCE;
 using ScottPlot;
-using ScottPlot.Finance;
 using ScottPlot.Plottables;
 using ScottPlot.WinForms;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using static Jubby_AutoTrade_UI.COMMON.Flag;
 
@@ -79,8 +73,7 @@ namespace Jubby_AutoTrade_UI.GUI
             /// 차트 생성
             FormsPlotMain = new ScottPlot.WinForms.FormsPlot();
             FormsPlotMain.Dock = DockStyle.Fill;    // 패널 또는 폼 전체 꽉 채우기
-            this.Controls.Add(FormsPlotMain);       // 폼에 추가
-
+            palGrapic1.Controls.Add(FormsPlotMain);  // [수정된 부분] this.Controls.Add 대신 palGrapic1에 추가합니다.
         }
         #endregion ## UI Organize ##
 
@@ -127,7 +120,14 @@ namespace Jubby_AutoTrade_UI.GUI
             // 심볼로 인덱스 검색
             int idx = StockList.FindIndex(s => s.Symbol == symbol);
             if (idx == -1)
-                return; // 못 찾으면 그냥 무시
+                return; // 못 찾으면 무시
+
+            // [수정] 현재 보고 있는 종목과 다른 종목을 클릭했다면 차트 화면(리스트) 초기화
+            if (CurrentIndex != idx)
+            {
+                OHLCList.Clear();
+                OrderHistoryList.Clear();
+            }
 
             CurrentIndex = idx;
             LoadChart(StockList[CurrentIndex]);
@@ -206,6 +206,9 @@ namespace Jubby_AutoTrade_UI.GUI
             /// 시세 데이터(Market)를 반영해서 "봉 1개" 추가
             // 지금 구조는 "실시간으로 새 봉이 들어오는" 형태 예시다.
             // 나중에 과거 봉들도 그릴 거면 이 부분을 바꾸면 됨.
+            // [핵심] 차트에 봉이 추가되기 전의 개수를 기억해 둡니다.
+            int beforeCount = OHLCList.Count;
+
             AppendOHLCFromMarket(info.Market);
 
             /// 주문 히스토리를 BUY/SELL 마커로 변환
@@ -214,63 +217,109 @@ namespace Jubby_AutoTrade_UI.GUI
 
             /// 축 자동 스케일 조정
             // 현재 OHLC + 마커 + 거래량 범위에 맞게 자동으로 확대/축소
-            FormsPlotMain.Plot.Axes.AutoScale();
+            // 🚨 [삭제 또는 주석 처리] 🚨
+            // 이 코드가 0.1초마다 줌을 초기화시켜서 그래프가 발작하게 만듭니다.
+            // FormsPlotMain.Plot.Axes.AutoScale();
+
+            // [수정] 무조건 스케일을 초기화하는 게 아니라,
+            // 데이터가 처음 들어왔을 때(빈 차트일 때) 딱 한 번만 카메라 초점을 맞춰줍니다.
+            if (beforeCount == 0)
+            {
+                FormsPlotMain.Plot.Axes.AutoScale();
+            }
 
             /// 실제 화면 다시 그리기
             FormsPlotMain.Refresh();
         }
         #endregion ## Load Chart ##
 
-        #region ## Apeend OHLC Form Market ##
-        // TradeMarketData 한 건을 받아서
-        // OHLC 1개 생성 → _ohlcList에 추가
-        // 거래량 1개 → _volumeList에 추가
-        // 그리고 CandlestickPlot에 리스트를 반영한다.
+        #region ## Append OHLC From Market ##
         private void AppendOHLCFromMarket(Flag.TradeMarketData m)
         {
             if (m == null)
                 return;
 
-            /// 봉의 기준 시간을 지금 시각으로 사용
-            // 실제로는 봉 시작 시간(예: 09:01:00)을 넘겨 받아 사용하는 게 더 정확.
+            // 1. 고가/저가 오류 보정
+            decimal high = m.High_Price;
+            decimal low = m.Low_Price;
+
+            if (high < low)
+            {
+                high = Math.Max(m.Open_Price, Math.Max(m.High_Price, m.Last_Price));
+                low = Math.Min(m.Open_Price, Math.Min(m.Low_Price, m.Last_Price));
+            }
+
             DateTime now = DateTime.Now;
+            // 2. 현재 시간을 '분(Minute)' 단위로 절사 (예: 10:05:33 -> 10:05:00)
+            DateTime currentMinute = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
 
-            var ohlc = new OHLC(
-                (double)m.Open_Price,
-                (double)m.High_Price,
-                (double)m.Low_Price,
-                (double)m.Last_Price,
-                now,                                // startTime
-                TimeSpan.FromMinutes(1)             // period
-            );
+            // 3. 같은 1분 내에 데이터가 들어오면 기존 캔들 업데이트
+            if (OHLCList.Count > 0 && OHLCList.Last().DateTime == currentMinute)
+            {
+                var lastCandle = OHLCList.Last();
 
-            OHLCList.Add(ohlc);
-            if (OHLCList.Count > MaxBars)
-                OHLCList.RemoveAt(0);
+                // 기존 고가/저가와 새로 들어온 값을 비교하여 갱신
+                double newHigh = Math.Max(lastCandle.High, (double)high);
+                double newLow = Math.Min(lastCandle.Low, (double)low);
+                double newClose = (double)m.Last_Price; // 종가는 항상 최신 현재가
 
-            /// CandlestickPlot 새로 생성
+                // 캔들 교체
+                OHLCList[OHLCList.Count - 1] = new OHLC(lastCandle.Open, newHigh, newLow, newClose, currentMinute, TimeSpan.FromMinutes(1));
+
+                // 거래량 누적
+                OrderHistoryList[OrderHistoryList.Count - 1] += (double)m.Volume;
+            }
+            else
+            {
+                // 4. 분이 바뀌었거나 첫 데이터면 새로운 캔들 추가
+                var ohlc = new OHLC(
+                    (double)m.Open_Price,
+                    (double)high,
+                    (double)low,
+                    (double)m.Last_Price,
+                    currentMinute,
+                    TimeSpan.FromMinutes(1)
+                );
+
+                OHLCList.Add(ohlc);
+                if (OHLCList.Count > MaxBars) OHLCList.RemoveAt(0);
+
+                OrderHistoryList.Add((double)m.Volume);
+                if (OrderHistoryList.Count > MaxBars) OrderHistoryList.RemoveAt(0);
+            }
+
+            // ====================================================================
+            // 5. 차트 다시 그리기 (렌더링)
+            // ====================================================================
+
+            // [가격 캔들 차트 - 왼쪽 기본 Y축 사용]
+            if (CandlePlot != null)
+                FormsPlotMain.Plot.Remove(CandlePlot);
             CandlePlot = FormsPlotMain.Plot.Add.Candlestick(OHLCList.ToArray());
 
-            /// 거래량 리스트 업데이트
-            OrderHistoryList.Add((double)m.Volume);
-            if (OrderHistoryList.Count > MaxBars)
-                OrderHistoryList.RemoveAt(0);
-
-            /// 기존 VolumePlot 제거
+            // [거래량 바 차트 - 위치 동기화 및 오른쪽 보조 Y축 사용]
             if (VolumePlot != null)
                 FormsPlotMain.Plot.Remove(VolumePlot);
 
-            /// VolumePlot 새로 생성
-            VolumePlot = FormsPlotMain.Plot.Add.Bars(OrderHistoryList.ToArray());
-
-            /// Volume 스타일 적용
-            foreach (var bar in VolumePlot.Bars)
+            // 단순히 값만 넣지 않고, X축 위치(Position)를 캔들의 시간과 맞춰서 생성
+            List<ScottPlot.Bar> bars = new List<ScottPlot.Bar>();
+            for (int i = 0; i < OrderHistoryList.Count; i++)
             {
-                bar.FillColor = ScottPlot.Colors.Blue.WithAlpha(0.3);
-                bar.LineWidth = 0;
+                bars.Add(new ScottPlot.Bar()
+                {
+                    Position = OHLCList[i].DateTime.ToOADate(), // X축 위치를 해당 분(Minute)으로 고정
+                    Value = OrderHistoryList[i],                // Y축 크기는 거래량
+                    FillColor = ScottPlot.Colors.Blue.WithAlpha(0.3),
+                    LineWidth = 0
+                });
             }
+
+            VolumePlot = FormsPlotMain.Plot.Add.Bars(bars.ToArray());
+
+            // ★ [핵심] 거래량은 오른쪽(Right) Y축을 사용하도록 설정! (가격 차트 스케일 보호)
+            VolumePlot.Axes.YAxis = FormsPlotMain.Plot.Axes.Right;
         }
-        #endregion ## Apeend OHLC Form Market ##
+        #endregion ## Append OHLC From Market ##
 
         #region ## Update Order Markers ##
         // 종목의 주문 리스트(TradeOrderData)를 받아서

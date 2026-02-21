@@ -210,6 +210,14 @@ namespace Jubby_AutoTrade_UI.COMMON
                 }));
                 */
                 // =========================================================
+
+                // ========================================================
+                // 🚨 [여기에 추가!] 차트 데이터 업데이트 호출
+                // ========================================================
+                if (target == UpdateTarget.Market || target == UpdateTarget.All)
+                {
+                    Auto.Ins.formGraphic?.UpdateMarketData(info);
+                }
             }
 
             // APPLY UPDATE TARGET

@@ -404,7 +404,6 @@ namespace Jubby_AutoTrade_UI.GUI
         #endregion ## Update Order Markers ##
 
         #region ## Update Market Data (새 데이터 수신 시 호출) ##
-        // [새로 추가된 함수] Python에서 진짜 새 데이터가 왔을 때만 실행됩니다.
         internal void UpdateMarketData(Flag.JubbyStockInfo info)
         {
             if (this.InvokeRequired)
@@ -415,22 +414,29 @@ namespace Jubby_AutoTrade_UI.GUI
 
             if (!ChartInitialized) InitChart();
 
-            // 다른 종목을 보고 있다면 무시
-            if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count) return;
+            // 🚨 [수정 1] 종목 리스트가 비어있으면, 지금 들어온 종목을 무조건 첫 번째로 등록!
+            if (StockList == null) StockList = new List<Flag.JubbyStockInfo>();
+            if (StockList.Count == 0)
+            {
+                StockList.Add(info);
+                CurrentIndex = 0;
+            }
+
+            // 현재 화면에 띄운 종목의 데이터가 아니면 무시
             if (StockList[CurrentIndex].Symbol != info.Symbol) return;
 
-            // 1. 데이터 업데이트
+            // 1. 차트 데이터 갱신
             AppendOHLCFromMarket(info.Market);
             UpdateOrderMarkers(info.GetOrderListSafe());
 
-            // 2. [핵심] 가격이 0원이 아닐 때(진짜 데이터일 때)만 최초 1회 카메라 줌인!
+            // 2. 가격이 0원이 아닐 때(진짜 데이터일 때)만 최초 1회 카메라 줌인!
             if (isFirstScale && info.Market.Last_Price > 0)
             {
                 FormsPlotMain.Plot.Axes.AutoScale();
                 isFirstScale = false;
             }
 
-            // 3. 차트를 다시 그리라고 타이머에게 신호만 줌 (여기서 직접 Refresh 안 함 = 튕김 방지)
+            // 3. 차트를 다시 그리라고 타이머에게 신호 ON
             isDataUpdated = true;
         }
         #endregion
@@ -514,7 +520,9 @@ namespace Jubby_AutoTrade_UI.GUI
             // UpdateMarketData()에서 새 데이터를 넣고 "isDataUpdated = true" 신호를 주었을 때만 화면을 그립니다!
             if (isDataUpdated)
             {
+                // 이 명령이 실행되어야만 실제로 화면에 차트가 그려집니다!
                 FormsPlotMain.Refresh();
+
                 isDataUpdated = false; // 다 그렸으니 신호등 끄기
             }
         }

@@ -10,7 +10,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using static Jubby_AutoTrade_UI.COMMON.Flag;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement.TrackBar;
 
 namespace Jubby_AutoTrade_UI.COMMON
 {

@@ -42,7 +42,7 @@ namespace Jubby_AutoTrade_UI.COM
         // 0이면 사용 안 함
         public int HeartbeatTimeoutSeconds { get; set; } = 50;
 
-
+        #region ## 서버 시작 ##
         /// 서버 시작
         public void Start(int port = 9001)
         {
@@ -58,16 +58,18 @@ namespace Jubby_AutoTrade_UI.COM
             ListenThread.IsBackground = true;
             ListenThread.Start();
         }
+        #endregion ## 서버 시작 ##
 
-
+        #region ## 서벗 종료 ##
         // 서버 종료
         public void Stop()
         {
             Running = false;
             Listener?.Stop();
         }
+        #endregion ## 서버 종료 ##
 
-
+        #region ## 접속 대기 스레드 ##
         /// Python 클라이언트가 접속할 때까지 계속 대기하는 스레드
         private void ListenLoop()
         {
@@ -100,98 +102,91 @@ namespace Jubby_AutoTrade_UI.COM
                 }
             }
         }
+        #endregion ## 접속 대기 스레드 ##
 
-
+        #region ## 클라이언트 데이터 수신 ##
         /// 실제로 데이터를 주고받는 루프 (클라이언트 1개당 1개 스레드)
         // Python이 보내는 모든 메시지를 이곳에서 처리
         private void HandleClient(TcpClient client)
         {
             NetworkStream ns = client.GetStream();
-
-            // 마지막 메시지를 받은 시간 → Heartbeat 감지용
             DateTime lastMessageTime = DateTime.UtcNow;
 
             try
             {
                 while (client.Connected)
                 {
-                    // Heartbeat 타임아웃 체크
-                    if (HeartbeatTimeoutSeconds > 0 &&
-                        (DateTime.UtcNow - lastMessageTime).TotalSeconds > HeartbeatTimeoutSeconds)
+                    // 수정된 부분: 데이터가 아직 안 온 상태에서 타임아웃 체크 (무한 대기 방지)
+                    if (!ns.DataAvailable)
                     {
-                        // 일정 시간 동안 아무 메시지도 안 왔으면 끊어진 걸로 처리
-                        break;
+                        if (HeartbeatTimeoutSeconds > 0 &&
+                            (DateTime.UtcNow - lastMessageTime).TotalSeconds > HeartbeatTimeoutSeconds)
+                        {
+                            Console.WriteLine("Heartbeat Timeout: 연결이 끊어진 것으로 간주합니다.");
+                            break;
+                        }
+                        Thread.Sleep(10); // CPU 점유율 방지를 위해 짧게 대기
+                        continue;
                     }
 
                     // 6바이트 헤더 읽기
                     byte[] header = new byte[6];
-
-                    // ReadExact는 요청한 크기만큼 정확히 수신하는 함수 (중요!)
                     if (!ReadExact(ns, header, 0, 6))
                         break;
 
-                    // 프로토콜 정보 읽기
-                    byte version = header[0];         // 현재 버전=1
-                    byte flags = header[1];           // 압축 여부
+                    byte version = header[0];
+                    byte flags = header[1];
                     bool compressed = (flags & 0x01) != 0;
+                    int len = (header[2] << 24) | (header[3] << 16) | (header[4] << 8) | (header[5]);
 
-                    // body 길이 (big-endian)
-                    int len = (header[2] << 24) |
-                              (header[3] << 16) |
-                              (header[4] << 8) |
-                              (header[5]);
+                    if (len <= 0) continue;
 
-                    if (len <= 0)
-                        continue;   // 데이터 없음
-
-                    // body 읽기
                     byte[] body = new byte[len];
                     if (!ReadExact(ns, body, 0, len))
                         break;
 
-                    // 압축 데이터면 해제
                     if (compressed)
                         body = Decompress(body);
 
-                    // UTF-8 JSON 문자열로 변환
                     string jsonText = Encoding.UTF8.GetString(body);
-
-                    // JSON 파싱
                     JObject obj = JObject.Parse(jsonText);
+                    lastMessageTime = DateTime.UtcNow;
 
-                    lastMessageTime = DateTime.UtcNow;  // heartbeat 갱신
-
-                    // JsonMessage 객체로 변환
                     var msg = new JsonMessage
                     {
                         MsgType = obj["msg_type"]?.ToString() ?? "",
-                        Timestamp = obj["timestamp"] != null
-                            ? DateTime.Parse(obj["timestamp"].ToString())
-                            : DateTime.UtcNow,
+                        Timestamp = obj["timestamp"] != null ? DateTime.Parse(obj["timestamp"].ToString()) : DateTime.UtcNow,
                         Payload = obj["payload"]
                     };
 
-                    // UI 또는 외부 코드로 메시지 전달
-                    if (OnMessageReceived != null)
-                        OnMessageReceived(msg);
+                    // 수정된 부분: 메시지 처리 에러가 소켓을 끊지 못하도록 분리
+                    try
+                    {
+                        if (OnMessageReceived != null)
+                            OnMessageReceived(msg);
+                    }
+                    catch (Exception innerEx)
+                    {
+                        // 데이터 처리에 실패해도 통신은 살려둡니다.
+                        Console.WriteLine("메시지 데이터 처리 중 오류 발생 (연결은 유지됨): " + innerEx.Message);
+                    }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                // 통신 중 오류 발생
                 Console.WriteLine("HandleClient Exception: " + ex.Message);
             }
             finally
             {
-                // 접속 끊김 처리
                 if (OnClientDisconnected != null)
                     OnClientDisconnected(client);
 
                 client.Close();
             }
         }
+        #endregion ## 클라이언트 데이터 수신 ##
 
-
+        #region ## TCP 데이터 안정 수신 ##
         /// TCP Stream이 요청한 데이터 크기만큼 정확히 읽어올 때까지 반복
         // TCP는 패킷을 한 번에 안 줌
         // 그래서 대량 데이터 안정 수신에 필수
@@ -211,8 +206,9 @@ namespace Jubby_AutoTrade_UI.COM
             }
             return true;
         }
+        #endregion ## TCP 데이터 안정 수신 ##
 
-
+        #region ## 데이터 압축 해제 ##
         /// Python에서 zlib 압축된 데이터를 보냈다면 여기서 해제
         private byte[] Decompress(byte[] data)
         {
@@ -224,9 +220,10 @@ namespace Jubby_AutoTrade_UI.COM
                 return output.ToArray();
             }
         }
+        #endregion ## 데이터 압축 해제 ##
     }
 
-
+    #region ## JSON 메시지 모델 ##
     /// JSON 메시지를 C# 객체로 변환한 모델
     // Msg_Type : Market / Account / OrderHistory / Strategy / All / heartbeat...
     // Timestamp: 데이터 생성 시간
@@ -237,4 +234,5 @@ namespace Jubby_AutoTrade_UI.COM
         public DateTime Timestamp { get; set; }
         public JToken Payload { get; set; }
     }
+    #endregion ## JSON 메시지 모델 ##
 }

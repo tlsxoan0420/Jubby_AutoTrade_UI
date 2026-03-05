@@ -144,83 +144,102 @@ namespace Jubby_AutoTrade_UI.COMMON
         #endregion ## Jubby Stock Info ##
 
         #region ## Jubby Data Manager ##
-        ///  MESSAGE → JUBBYSTOCKINFO APPLY LOGIC (핵심 부분)
+        ///  MESSAGE → JUBBYSTOCKINFO APPLY LOGIC (핵심 컨트롤 타워)
         public class JubbyDataManager
         {
-            /// 종목별 저장소
+            /// 📚 종목별 보관소 (C#이 켜져 있는 동안 삼성전자, SK하이닉스 등의 데이터를 기억하는 장부입니다)
             private Dictionary<string, JubbyStockInfo> _stocks = new Dictionary<string, JubbyStockInfo>();
 
-            /// JSON MESSAGE 처리 → JubbyStockInfo 업데이트
+            /// 📡 파이썬 택배(JSON)가 도착하면 실행되는 함수
             public void HandleMessage(JsonMessage msg)
             {
-                // heartbeat는 무시
+                // 1. 단순 연결 확인(heartbeat) 신호는 그릴 게 없으니 가볍게 패스합니다.
                 if (msg.MsgType.Equals("heartbeat", StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // msg_type → UpdateTarget 매핑
+                // 2. 이 데이터가 마켓 정보인지, 계좌 정보인지 이름표(MsgType)를 확인합니다.
                 if (!Enum.TryParse<UpdateTarget>(msg.MsgType, true, out UpdateTarget target))
                 {
-                    Console.WriteLine($"[ERROR] Unknown msg_type : {msg.MsgType}");
+                    Console.WriteLine($"[ERROR] 알 수 없는 데이터 타입 : {msg.MsgType}");
                     return;
                 }
 
-                // symbol 필드 확인
-                string symbol = msg.Payload["symbol"]?.ToString();
-                if (string.IsNullOrEmpty(symbol))
+                // 🚨 [데이터 뭉침 해결의 열쇠] 🚨
+                // 파이썬이 이제 종목 10개를 묶어서(배열 형태) 보냅니다.
+                if (msg.Payload is JArray payloadArray)
                 {
-                    Console.WriteLine("[ERROR] payload.symbol 없음");
-                    return;
-                }
+                    // 💡 배열 안에 든 10개의 종목을 하나씩 꺼내서(foreach) 처리합니다.
+                    foreach (JToken item in payloadArray)
+                    {
+                        // 1. 종목코드(symbol)를 가져옵니다. (없으면 불량품이니 다음 걸로!)
+                        string symbol = item["symbol"]?.ToString();
+                        if (string.IsNullOrEmpty(symbol)) continue;
 
-                // 필수: 종목명(name)
-                string name = msg.Payload["symbol_name"]?.ToString();
-                if (string.IsNullOrEmpty(name))
-                {
-                    Console.WriteLine("[ERROR] payload.name 없음");
-                    return;
-                }
+                        // 2. 회사이름(symbol_name)을 가져옵니다. (삼성전자, SK하이닉스 등)
+                        string name = item["symbol_name"]?.ToString() ?? symbol;
 
-                // 종목 찾기 OR 새로 만들기
-                if (!_stocks.TryGetValue(symbol, out JubbyStockInfo info))
-                {
-                    // ★ 여기 수정됨: name 을 반드시 저장
-                    info = new JubbyStockInfo(symbol, name);
-                    _stocks[symbol] = info;
+                        // 💡 "내 장부에 이 종목이 처음인가?" 확인하고 없으면 새로 만듭니다.
+                        if (!_stocks.TryGetValue(symbol, out JubbyStockInfo info))
+                        {
+                            info = new JubbyStockInfo(symbol, name);
+                            _stocks[symbol] = info;
+
+                            // 장부의 맨 첫 번째 종목은 '대표 종목'으로 기억해둡니다 (화면 초기 세팅용)
+                            if (FirstSymbol == null) FirstSymbol = symbol;
+                        }
+                        else
+                        {
+                            // 이미 있는 종목이면 이름만 혹시 모르니 다시 적어줍니다.
+                            info.Name = name;
+                        }
+
+                        // 💡 [에러 해결 포인트] 파이썬의 '글자' 데이터를 C#의 '숫자'로 안전하게 변환해서 저장합니다.
+                        ApplyUpdate(info, target, item);
+
+                        // 3. UI 표(DataGridView)에 데이터를 갱신하라고 명령합니다.
+                        // 💡 여기서 서로 다른 종목코드(000, 001...)를 쓰기 때문에 이제 표에 10줄이 쫙 나옵니다!
+                        Auto.Ins.formDataChart?.SafeApplyStockUpdate(info, target);
+
+                        // 4. 차트 화면(FormGraphic)에도 데이터를 던져서 실시간 캔들을 그리게 합니다.
+                        if (target == UpdateTarget.Market || target == UpdateTarget.All)
+                        {
+                            // 🚀 [중요] 차트는 데이터 하나하나가 중요하므로 Invoke로 순서대로 밀어넣습니다.
+                            Auto.Ins.formGraphic?.Invoke(new Action(() => {
+                                Auto.Ins.formGraphic.UpdateMarketData(info);
+                            }));
+                        }
+                    }
                 }
                 else
                 {
-                    // 이미 존재하더라도 name 변경 가능하도록 갱신해줌 (중요)
-                    info.Name = name;
-                }
-                // 업데이트 적용
-                ApplyUpdate(info, target, msg.Payload);
-
-                // 1. UI 테이블 업데이트 (현재 작동 중)
-                Auto.Ins.formDataChart?.SafeApplyStockUpdate(info, target);
-
-                // 2. [추가] 차트 화면 업데이트
-                // 현재 선택된 종목이 업데이트된 종목과 같다면 차트도 즉시 갱신
-                // =========================================================
-                // 🚨 [매우 중요: 삭제할 부분] 🚨
-                // 저번에 추가했던 아래의 FormGraphic 강제 Invoke 부분을 완전히 지워주세요!
-                // 차트 갱신은 FormGraphic의 timer1이 알아서 안전하게 처리해야 안 튕깁니다.
-                /*
-                Auto.Ins.formGraphic?.Invoke(new Action(() => {
-                    Auto.Ins.formGraphic.LoadChart(info);
-                }));
-                */
-                // =========================================================
-
-                // ========================================================
-                // 🚨 [여기에 추가!] 차트 데이터 업데이트 호출
-                // ========================================================
-                if (target == UpdateTarget.Market || target == UpdateTarget.All)
-                {
-                    Auto.Ins.formGraphic?.UpdateMarketData(info);
+                    Console.WriteLine($"[ERROR] 데이터 형식이 배열(List)이 아닙니다! MsgType: {msg.MsgType}");
                 }
             }
 
-            // APPLY UPDATE TARGET
+            // ====================================================================
+            // ✨ [만능 숫자 변환기: ParseDecimal]
+            // 파이썬은 "3.50%"(퍼센트) 나 "5,000,000"(쉼표) 처럼 사람이 보기 편하게 '글자'로 보냅니다.
+            // C#은 '숫자 방(decimal)'에 글자를 넣으면 에러가 납니다.
+            // 그래서 기호(%, ,)를 싹 지우고 순수한 숫자로 바꿔주는 세탁기 함수를 만들었습니다.
+            // ====================================================================
+            private decimal ParseDecimal(JToken token, decimal defaultValue)
+            {
+                if (token == null) return defaultValue; // 값이 비어있으면 원래 값을 그대로 씁니다.
+
+                // 1. 글자에서 쉼표(,)와 퍼센트(%)를 지우고 빈칸을 제거합니다.
+                string strVal = token.ToString().Replace(",", "").Replace("%", "").Trim();
+
+                // 2. 숫자로 변환에 성공하면 그 값을 돌려주고, 실패하면 원래 값을 돌려줍니다.
+                if (decimal.TryParse(strVal, out decimal result))
+                {
+                    return result;
+                }
+                return defaultValue;
+            }
+
+            // ====================================================================
+            // 📝 [데이터 분배 함수] 택배 내용물을 각 주머니(Market, Account 등)에 넣습니다.
+            // ====================================================================
             private void ApplyUpdate(JubbyStockInfo info, UpdateTarget target, JToken p)
             {
                 switch (target)
@@ -228,20 +247,17 @@ namespace Jubby_AutoTrade_UI.COMMON
                     case UpdateTarget.Market:
                         ApplyMarket(info.Market, p);
                         break;
-
                     case UpdateTarget.Account:
                         ApplyAccount(info.MyAccount, p);
                         break;
-
                     case UpdateTarget.Order:
                         ApplyOrder(info, p);
                         break;
-
                     case UpdateTarget.Strategy:
                         ApplyStrategy(info.Strategy, p);
                         break;
-
                     case UpdateTarget.All:
+                        // 'All' 타입일 경우 모든 항목을 다 챙깁니다.
                         if (p["market"] != null) ApplyMarket(info.Market, p["market"]);
                         if (p["account"] != null) ApplyAccount(info.MyAccount, p["account"]);
                         if (p["order"] != null) ApplyOrder(info, p["order"]);
@@ -252,26 +268,28 @@ namespace Jubby_AutoTrade_UI.COMMON
 
             private void ApplyMarket(TradeMarketData m, JToken p)
             {
-                m.Last_Price = p["last_price"]?.Value<decimal>() ?? m.Last_Price;
-                m.Open_Price = p["open_price"]?.Value<decimal>() ?? m.Open_Price;
-                m.High_Price = p["high_price"]?.Value<decimal>() ?? m.High_Price;
-                m.Low_Price = p["low_price"]?.Value<decimal>() ?? m.Low_Price;
-
-                m.Bid_Price = p["bid_price"]?.Value<decimal>() ?? m.Bid_Price;
-                m.Ask_Price = p["ask_price"]?.Value<decimal>() ?? m.Ask_Price;
-
-                m.Bid_Size = p["bid_size"]?.Value<decimal>() ?? m.Bid_Size;
-                m.Ask_Size = p["ask_size"]?.Value<decimal>() ?? m.Ask_Size;
-
-                m.Volume = p["volume"]?.Value<decimal>() ?? m.Volume;
+                // 모든 가격 데이터는 세탁기(ParseDecimal)를 거쳐서 숫자로 안전하게 들어갑니다.
+                m.Last_Price = ParseDecimal(p["last_price"], m.Last_Price);
+                m.Open_Price = ParseDecimal(p["open_price"], m.Open_Price);
+                m.High_Price = ParseDecimal(p["high_price"], m.High_Price);
+                m.Low_Price = ParseDecimal(p["low_price"], m.Low_Price);
+                m.Bid_Price = ParseDecimal(p["bid_price"], m.Bid_Price);
+                m.Ask_Price = ParseDecimal(p["ask_price"], m.Ask_Price);
+                m.Bid_Size = ParseDecimal(p["bid_size"], m.Bid_Size);
+                m.Ask_Size = ParseDecimal(p["ask_size"], m.Ask_Size);
+                m.Volume = ParseDecimal(p["volume"], m.Volume);
             }
 
             private void ApplyAccount(TradeAccountData acc, JToken p)
             {
-                acc.Quantity = p["quantity"]?.Value<decimal>() ?? acc.Quantity;
-                acc.Avg_Price = p["avg_price"]?.Value<decimal>() ?? acc.Avg_Price;
-                acc.Pnl = p["pnl"]?.Value<decimal>() ?? acc.Pnl;
-                acc.Available_Cash = p["available_cash"]?.Value<decimal>() ?? acc.Available_Cash;
+                acc.Quantity = ParseDecimal(p["quantity"], acc.Quantity);
+                acc.Avg_Price = ParseDecimal(p["avg_price"], acc.Avg_Price);
+
+                // 💡 [에러 해결] 파이썬이 보낸 "3.50%" 글자를 숫자로 세탁해서 넣습니다.
+                acc.Pnl = ParseDecimal(p["pnl"], acc.Pnl);
+
+                // 💡 [에러 해결] 파이썬이 보낸 "5,000,000" 글자를 숫자로 세탁해서 넣습니다.
+                acc.Available_Cash = ParseDecimal(p["available_cash"], acc.Available_Cash);
             }
 
             private void ApplyOrder(JubbyStockInfo info, JToken p)
@@ -279,22 +297,24 @@ namespace Jubby_AutoTrade_UI.COMMON
                 TradeOrderData o = new TradeOrderData
                 {
                     Order_Type = p["order_type"]?.ToString(),
-                    Order_Price = p["order_price"]?.Value<decimal>() ?? 0,
-                    Order_Quantity = p["order_quantity"]?.Value<decimal>() ?? 0,
-                    Filled_Quqntity = p["filled_quantity"]?.Value<decimal>() ?? 0,
+                    Order_Price = ParseDecimal(p["order_price"], 0),
+                    Order_Quantity = ParseDecimal(p["order_quantity"], 0),
+                    Filled_Quqntity = ParseDecimal(p["filled_quantity"], 0),
                     Order_Time = p["order_time"]?.ToString(),
-                    Status = p["Status"]?.ToString(),
+                    Status = p["order_status"]?.ToString(),
                 };
-
                 info.AddOrder(o);
             }
 
             private void ApplyStrategy(TradeStrategyData s, JToken p)
             {
-                s.Ma_5 = p["ma_5"]?.Value<decimal>() ?? s.Ma_5;
-                s.Ma_20 = p["ma_20"]?.Value<decimal>() ?? s.Ma_20;
-                s.RSI = p["RSI"]?.Value<decimal>() ?? s.RSI;
-                s.MACD = p["macd"]?.Value<decimal>() ?? s.MACD;
+                s.Ma_5 = ParseDecimal(p["ma_5"], s.Ma_5);
+                s.Ma_20 = ParseDecimal(p["ma_20"], s.Ma_20);
+                s.RSI = ParseDecimal(p["rsi"], s.RSI);
+
+                // 💡 [에러 해결] AI 확률 문자열("75.4%")을 숫자로 변환합니다.
+                s.MACD = ParseDecimal(p["macd"], s.MACD);
+
                 s.Signal = p["signal"]?.ToString() ?? s.Signal;
             }
 
@@ -303,16 +323,11 @@ namespace Jubby_AutoTrade_UI.COMMON
 
             public JubbyStockInfo GetStock(string symbol)
             {
-                if (_stocks == null)
-                    return null;
-
-                if (_stocks.TryGetValue(symbol, out JubbyStockInfo info))
-                    return info;
-
+                if (_stocks == null) return null;
+                if (_stocks.TryGetValue(symbol, out JubbyStockInfo info)) return info;
                 return null;
             }
         }
-
         #endregion ## Jubby Data Manager ##
 
         #region ## Trade Data ##

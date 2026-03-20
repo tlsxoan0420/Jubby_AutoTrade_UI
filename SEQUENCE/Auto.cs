@@ -91,14 +91,25 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         //  STOP() — 전체 시스템 종료
         public void Stop()
         {
-            // [수정 3] 치명적 오타 수정: Running이 '아닐 때(!)' 리턴해야 함. (기존 if(Running)은 서버를 못 끄게 만듦)
+            // [수정 3] 치명적 오타 수정: Running이 '아닐 때(!)' 리턴해야 함.
             if (!Running)
                 return;
 
             Running = false;
 
-            // 서버 정지
+            // 1. 서버 정지
             Server.Stop();
+
+            // 💡 [핵심 추가] 2. 자동매매가 멈출 때 차트를 백업(저장)하라는 명령 전달!
+            // UI를 그리는 FormGraphic이 살아있는지(에러 방지) 확인한 후 안전하게 실행합니다.
+            if (formGraphic != null && formGraphic.IsHandleCreated && !formGraphic.IsDisposed)
+            {
+                formGraphic.BeginInvoke(new Action(() =>
+                {
+                    // FormGraphic에 구현해둔 그래프 데이터 추출 및 저장 함수 호출
+                    formGraphic.SaveInteractiveChart();
+                }));
+            }
         }
         #endregion ## Auto Stop ##
 

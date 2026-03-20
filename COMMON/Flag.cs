@@ -62,7 +62,7 @@ namespace Jubby_AutoTrade_UI.COMMON
         {
             Market,             // 1. 시세만 (Market)
             Account,            // 2. 내 잔고만 (MyAccount)
-            Order,       // 3. 주문내역만 (OrderHistory)
+            Order,              // 3. 주문내역만 (OrderHistory)
             Strategy,           // 4. 전략 신호만 (Strategy)
             All,                // 5. 전체 (All)
         }
@@ -80,7 +80,6 @@ namespace Jubby_AutoTrade_UI.COMMON
             public TradeAccountData MyAccount { get; set; } = new TradeAccountData();
 
             // 3-3. 주문내역([중요]'여러 개'일 수 있으므로 List로 관리해야 함)
-
             // [핵심] 리스트 보호를 위한 자물쇠 객체 (스레드 충돌 방지)
             private readonly object OrderLock = new object();
 
@@ -149,6 +148,16 @@ namespace Jubby_AutoTrade_UI.COMMON
         {
             /// 📚 종목별 보관소 (C#이 켜져 있는 동안 삼성전자, SK하이닉스 등의 데이터를 기억하는 장부입니다)
             private Dictionary<string, JubbyStockInfo> _stocks = new Dictionary<string, JubbyStockInfo>();
+
+            public string FirstSymbol { get; private set; } = null;
+            public bool FirstDataReceived => FirstSymbol != null;
+
+            public JubbyStockInfo GetStock(string symbol)
+            {
+                if (_stocks == null) return null;
+                if (_stocks.TryGetValue(symbol, out JubbyStockInfo info)) return info;
+                return null;
+            }
 
             /// 📡 파이썬 택배(JSON)가 도착하면 실행되는 함수
             public void HandleMessage(JsonMessage msg)
@@ -273,10 +282,13 @@ namespace Jubby_AutoTrade_UI.COMMON
                 m.Open_Price = ParseDecimal(p["open_price"], m.Open_Price);
                 m.High_Price = ParseDecimal(p["high_price"], m.High_Price);
                 m.Low_Price = ParseDecimal(p["low_price"], m.Low_Price);
-                m.Bid_Price = ParseDecimal(p["bid_price"], m.Bid_Price);
-                m.Ask_Price = ParseDecimal(p["ask_price"], m.Ask_Price);
-                m.Bid_Size = ParseDecimal(p["bid_size"], m.Bid_Size);
-                m.Ask_Size = ParseDecimal(p["ask_size"], m.Ask_Size);
+
+                // 💡 [핵심 교체] 지워진 호가창 데이터 대신 파이썬이 보내주는 4대 지표 수신!
+                m.Return_1m = ParseDecimal(p["return_1m"], m.Return_1m);
+                m.Trade_Amount = ParseDecimal(p["trade_amount"], m.Trade_Amount);
+                m.Vol_Energy = ParseDecimal(p["vol_energy"], m.Vol_Energy);
+                m.Disparity = ParseDecimal(p["disparity"], m.Disparity);
+
                 m.Volume = ParseDecimal(p["volume"], m.Volume);
             }
 
@@ -285,10 +297,10 @@ namespace Jubby_AutoTrade_UI.COMMON
                 acc.Quantity = ParseDecimal(p["quantity"], acc.Quantity);
                 acc.Avg_Price = ParseDecimal(p["avg_price"], acc.Avg_Price);
 
-                // 💡 [에러 해결] 파이썬이 보낸 "3.50%" 글자를 숫자로 세탁해서 넣습니다.
-                acc.Pnl = ParseDecimal(p["pnl"], acc.Pnl);
+                // 💡 파이썬이 보내주는 현재가를 받습니다!
+                acc.Current_Price = ParseDecimal(p["current_price"], acc.Current_Price);
 
-                // 💡 [에러 해결] 파이썬이 보낸 "5,000,000" 글자를 숫자로 세탁해서 넣습니다.
+                acc.Pnl = ParseDecimal(p["pnl"], acc.Pnl);
                 acc.Available_Cash = ParseDecimal(p["available_cash"], acc.Available_Cash);
             }
 
@@ -317,16 +329,6 @@ namespace Jubby_AutoTrade_UI.COMMON
 
                 s.Signal = p["signal"]?.ToString() ?? s.Signal;
             }
-
-            public string FirstSymbol { get; private set; } = null;
-            public bool FirstDataReceived => FirstSymbol != null;
-
-            public JubbyStockInfo GetStock(string symbol)
-            {
-                if (_stocks == null) return null;
-                if (_stocks.TryGetValue(symbol, out JubbyStockInfo info)) return info;
-                return null;
-            }
         }
         #endregion ## Jubby Data Manager ##
 
@@ -339,10 +341,13 @@ namespace Jubby_AutoTrade_UI.COMMON
             public decimal Open_Price { get; set; }        // 2. 시가
             public decimal High_Price { get; set; }        // 3. 고가
             public decimal Low_Price { get; set; }         // 4. 저가
-            public decimal Bid_Price { get; set; }         // 5. 매수호가
-            public decimal Ask_Price { get; set; }         // 6. 매도호가
-            public decimal Bid_Size { get; set; }          // 7. 매수잔량
-            public decimal Ask_Size { get; set; }          // 8. 매도잔량
+
+            // 💡 [핵심 교체] 호가/잔량 4개 지우고 단타 지표 4개 추가
+            public decimal Return_1m { get; set; }         // 5. 1분 등락률(%)
+            public decimal Trade_Amount { get; set; }      // 6. 거래대금(백만원)
+            public decimal Vol_Energy { get; set; }        // 7. 거래량 에너지(배수)
+            public decimal Disparity { get; set; }         // 8. 이격도(과열 지표)
+
             public decimal Volume { get; set; }            // 9. 거래량
         }
 
@@ -351,11 +356,12 @@ namespace Jubby_AutoTrade_UI.COMMON
         {
             public decimal Quantity { get; set; }          // 1. 보유수량
             public decimal Avg_Price { get; set; }         // 2. 평균 매입가
-            public decimal Pnl { get; set; }               // 3. 평가손익
-            public decimal Available_Cash { get; set; }    // 4. 주문 가능 금액
+            public decimal Current_Price { get; set; }     // 💡 3. 현재가 (추가됨!)
+            public decimal Pnl { get; set; }               // 4. 평가손익
+            public decimal Available_Cash { get; set; }    // 5. 주문 가능 금액
         }
 
-        // 3. 전략 분석 정보 데이터
+        // 3. 주문 내역 데이터
         public class TradeOrderData
         {
             public string Order_Type { get; set; }       // 1. 주문종류
@@ -366,7 +372,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             public string Status { get; set; }            // 6. 주문상태
         }
 
-        // 4. 주문 내역 데이터
+        // 4. 전략 분석 정보 데이터
         public class TradeStrategyData
         {
             public decimal Ma_5 { get; set; }                  // 1. 단기 이동평균

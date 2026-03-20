@@ -5,7 +5,9 @@ using ScottPlot.Plottables;
 using ScottPlot.WinForms;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using static Jubby_AutoTrade_UI.COMMON.Flag;
 
@@ -28,6 +30,11 @@ namespace Jubby_AutoTrade_UI.GUI
         /// 데이터 구성: (시간[OADate], 가격, "BUY" or "SELL")
         /// </summary>
         private Dictionary<string, List<(double time, double price, string type)>> OrderMarkers = new Dictionary<string, List<(double time, double price, string type)>>();
+
+        /// <summary>
+        /// 📈 [신규 기능] 종목별 '평균 매입가(평단가)'를 기억하는 바구니입니다!
+        /// </summary>
+        private Dictionary<string, double> AveragePrices = new Dictionary<string, double>();
 
         /// <summary>
         /// 💡 현재 사용자가 화면으로 보고 있는 '종목 코드'입니다. (표에서 클릭한 종목)
@@ -109,6 +116,12 @@ namespace Jubby_AutoTrade_UI.GUI
                 StockDataBuckets[info.Symbol] = new List<OHLC>();
             }
 
+            // 💡 [신규] 파이썬에서 넘어온 '평균 매입가'를 전용 바구니에 업데이트합니다.
+            if (info.MyAccount != null)
+            {
+                AveragePrices[info.Symbol] = (double)info.MyAccount.Avg_Price;
+            }
+
             // =========================================================================
             // 💡 [문제 해결] 파이썬에서 데이터 누락/0원 수신 시 캔들 찌그러짐 방지 로직
             // =========================================================================
@@ -150,23 +163,35 @@ namespace Jubby_AutoTrade_UI.GUI
 
         /// <summary>
         /// 🎯 [핵심 기능] 파이썬에서 매수/매도를 때리면 그 흔적(타점)을 기록합니다!
+        /// (과거 데이터 복원 시, 파이썬이 보내준 과거 시간을 반영하여 정확한 위치에 찍습니다.)
         /// </summary>
-        public void AddOrderMarker(string symbol, string type, double price)
+        public void AddOrderMarker(string symbol, string type, double price, string timeStr = "")
         {
             if (string.IsNullOrWhiteSpace(symbol)) return;
 
-            // 이 종목 마커 바구니가 없으면 생성
             if (!OrderMarkers.ContainsKey(symbol))
                 OrderMarkers[symbol] = new List<(double, double, string)>();
 
-            // 매매가 체결된 '현재 시간'과 '가격', 그리고 '종류(BUY/SELL)'를 저장합니다.
-            OrderMarkers[symbol].Add((DateTime.Now.ToOADate(), price, type));
+            // 💡 [과거 시간 복원] 파이썬에서 넘어온 "2026-03-20 13:07:59" 같은 문자열을 진짜 시간으로 변환
+            DateTime orderTime = DateTime.Now;
+            if (!string.IsNullOrEmpty(timeStr))
+            {
+                DateTime.TryParse(timeStr, out orderTime);
+            }
 
-            if (CurrentSelectedSymbol == symbol) isDataUpdated = true;
+            double oaDate = orderTime.ToOADate();
+
+            // 💡 [중복 점 찍기 방지] 이미 그 시간에 똑같은 화살표가 그려져 있다면 무시합니다.
+            bool isExist = OrderMarkers[symbol].Any(m => m.time == oaDate && m.type == type);
+            if (!isExist)
+            {
+                OrderMarkers[symbol].Add((oaDate, price, type));
+                if (CurrentSelectedSymbol == symbol) isDataUpdated = true;
+            }
         }
 
         /// <summary>
-        /// 🎨 실제로 현재 선택된 종목의 캔들 + 매매 마커(점)를 도화지에 그려냅니다.
+        /// 🎨 실제로 현재 선택된 종목의 캔들 + 매매 마커(점) + 평단가 선을 도화지에 그려냅니다.
         /// </summary>
         internal void LoadChart(string symbol)
         {
@@ -177,36 +202,69 @@ namespace Jubby_AutoTrade_UI.GUI
             if (StockDataBuckets.ContainsKey(symbol))
             {
                 var myBucket = StockDataBuckets[symbol];
-                if (myBucket.Count > 0) plt.Add.Candlestick(myBucket);
+                if (myBucket.Count > 0)
+                {
+                    var candlePlot = plt.Add.Candlestick(myBucket);
+                }
             }
 
-            // 🎯 2. 매매 타점(마커) 그리기
+            // 🎯 2. 매매 타점(마커) 그리기 (3색상 분리 완벽 적용)
             if (OrderMarkers.ContainsKey(symbol))
             {
                 var markers = OrderMarkers[symbol];
 
-                // 🔴 BUY(매수) 타점 그리기: 빨간색 위쪽 화살표(▲)
-                var buyX = markers.Where(m => m.type == "BUY").Select(m => m.time).ToArray();
-                var buyY = markers.Where(m => m.type == "BUY").Select(m => m.price).ToArray();
-                if (buyX.Length > 0)
+                // 🔵 BUY(매수) 타점 그리기: 파란색 위쪽 화살표(▲)
+                var buyMarkers = markers.Where(m => m.type == "BUY").ToList();
+                if (buyMarkers.Count > 0)
                 {
+                    double[] buyX = buyMarkers.Select(m => m.time).ToArray();
+                    double[] buyY = buyMarkers.Select(m => m.price).ToArray();
                     var spBuy = plt.Add.Scatter(buyX, buyY);
                     spBuy.LineStyle.Width = 0; // 선으로 잇지 않음
                     spBuy.MarkerStyle.Shape = MarkerShape.FilledTriangleUp;
                     spBuy.MarkerStyle.Size = 15;
-                    spBuy.MarkerStyle.FillColor = Colors.Red;
+                    spBuy.MarkerStyle.FillColor = Colors.Blue;
                 }
 
-                // 🔵 SELL(매도) 타점 그리기: 파란색 아래쪽 화살표(▼)
-                var sellX = markers.Where(m => m.type == "SELL").Select(m => m.time).ToArray();
-                var sellY = markers.Where(m => m.type == "SELL").Select(m => m.price).ToArray();
-                if (sellX.Length > 0)
+                // 🟢 SELL_PROFIT(익절) 타점 그리기: 라임색 아래쪽 화살표(▼)
+                var profitMarkers = markers.Where(m => m.type == "SELL_PROFIT").ToList();
+                if (profitMarkers.Count > 0)
                 {
-                    var spSell = plt.Add.Scatter(sellX, sellY);
-                    spSell.LineStyle.Width = 0;
-                    spSell.MarkerStyle.Shape = MarkerShape.FilledTriangleDown;
-                    spSell.MarkerStyle.Size = 15;
-                    spSell.MarkerStyle.FillColor = Colors.Blue;
+                    double[] sellX = profitMarkers.Select(m => m.time).ToArray();
+                    double[] sellY = profitMarkers.Select(m => m.price).ToArray();
+                    var spSellProfit = plt.Add.Scatter(sellX, sellY);
+                    spSellProfit.LineStyle.Width = 0;
+                    spSellProfit.MarkerStyle.Shape = MarkerShape.FilledTriangleDown;
+                    spSellProfit.MarkerStyle.Size = 15;
+                    spSellProfit.MarkerStyle.FillColor = Colors.Lime;
+                }
+
+                // 🔴 SELL_LOSS(손절 및 기타매도) 타점 그리기: 빨간색 아래쪽 화살표(▼)
+                var lossMarkers = markers.Where(m => m.type == "SELL_LOSS" || m.type == "SELL").ToList();
+                if (lossMarkers.Count > 0)
+                {
+                    double[] sellX = lossMarkers.Select(m => m.time).ToArray();
+                    double[] sellY = lossMarkers.Select(m => m.price).ToArray();
+                    var spSellLoss = plt.Add.Scatter(sellX, sellY);
+                    spSellLoss.LineStyle.Width = 0;
+                    spSellLoss.MarkerStyle.Shape = MarkerShape.FilledTriangleDown;
+                    spSellLoss.MarkerStyle.Size = 15;
+                    spSellLoss.MarkerStyle.FillColor = Colors.Red;
+                }
+            }
+
+            // 📈 3. 평균 매입가(평단가) 선 그리기 [신규 기능!]
+            if (AveragePrices.ContainsKey(symbol))
+            {
+                double avgPrice = AveragePrices[symbol];
+
+                // 평단가가 0보다 클 때(즉, 진짜 보유하고 있을 때)만 그립니다.
+                if (avgPrice > 0)
+                {
+                    var hline = plt.Add.HorizontalLine(avgPrice);
+                    hline.LineStyle.Color = Colors.Magenta;            // 강렬한 마젠타(분홍) 색상
+                    hline.LineStyle.Width = 2;                         // 두께 2
+                    hline.LineStyle.Pattern = LinePattern.Dashed;      // 점선으로 표시하여 캔들과 구분
                 }
             }
 
@@ -240,6 +298,83 @@ namespace Jubby_AutoTrade_UI.GUI
             }
         }
 
+        #endregion
+
+        #region ## [5] 자동매매 종료 시 차트 데이터 백업 (CSV 추출) ##
+        /// <summary>
+        /// 💡 Auto.cs에서 Stop()이 불릴 때 실행됩니다.
+        /// 지금까지 모인 캔들(OHLC)과 매매 타점(마커) 데이터를 나중에 분석할 수 있도록
+        /// 엑셀(CSV) 파일로 예쁘게 뽑아서 저장합니다.
+        /// </summary>
+        public void SaveInteractiveChart()
+        {
+            try
+            {
+                // 1. 저장할 폴더 만들기 (프로그램 폴더 안의 ChartDataBackup 폴더)
+                string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string directoryPath = Path.Combine(Application.StartupPath, "ChartDataBackup");
+                if (!Directory.Exists(directoryPath))
+                {
+                    Directory.CreateDirectory(directoryPath);
+                }
+
+                string csvFilePath = Path.Combine(directoryPath, $"Jubby_TradeRecord_{timeStamp}.csv");
+
+                // 2. CSV 파일 쓰기 시작 (BOM을 추가하여 한글 깨짐 방지)
+                using (StreamWriter writer = new StreamWriter(csvFilePath, false, new UTF8Encoding(true)))
+                {
+                    // 헤더(열 이름) 작성
+                    writer.WriteLine("종목코드,시간,시가,고가,저가,종가,거래발생(타점)");
+
+                    // 3. 기록된 모든 종목의 캔들을 뒤지면서 기록
+                    foreach (var bucket in StockDataBuckets)
+                    {
+                        string symbol = bucket.Key;
+                        List<OHLC> candles = bucket.Value;
+
+                        // 이 종목의 매매 타점(마커)이 있는지 확인
+                        bool hasMarkers = OrderMarkers.ContainsKey(symbol);
+                        List<(double time, double price, string type)> markers = hasMarkers ? OrderMarkers[symbol] : null;
+
+                        foreach (var c in candles)
+                        {
+                            // 현재 캔들의 시간에 매수/매도 마커가 찍혀있는지 확인
+                            string tradeAction = "";
+                            if (hasMarkers)
+                            {
+                                // OADate를 DateTime으로 변환하여 시간 비교 (초 단위까지만 비교)
+                                var markerInThisCandle = markers.FirstOrDefault(m =>
+                                    DateTime.FromOADate(m.time).ToString("HH:mm:ss") == c.DateTime.ToString("HH:mm:ss"));
+
+                                if (markerInThisCandle.type != null)
+                                {
+                                    tradeAction = markerInThisCandle.type; // "BUY" 또는 "SELL_PROFIT", "SELL_LOSS" 기록
+                                }
+                            }
+
+                            // CSV 한 줄 만들기
+                            string line = $"{symbol},{c.DateTime:yyyy-MM-dd HH:mm:ss},{c.Open},{c.High},{c.Low},{c.Close},{tradeAction}";
+                            writer.WriteLine(line);
+                        }
+                    }
+                }
+
+                // UI 스레드에서 메시지박스 띄우기
+                this.BeginInvoke(new Action(() =>
+                {
+                    MessageBox.Show($"📈 딥러닝 복기용 차트 데이터가 성공적으로 백업되었습니다!\n\n저장 경로:\n{csvFilePath}",
+                                    "차트 데이터 백업 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }));
+            }
+            catch (Exception ex)
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    MessageBox.Show($"차트 데이터를 저장하는 중 에러가 발생했습니다.\n{ex.Message}",
+                                    "저장 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }));
+            }
+        }
         #endregion
     }
 }

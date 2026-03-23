@@ -1,12 +1,13 @@
-﻿using Jubby_AutoTrade_UI.COM;
-using Jubby_AutoTrade_UI.COMMON;
-using Jubby_AutoTrade_UI.GUI;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.IO;            // 💡 [추가] 폴더 생성을 위해 추가
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Jubby_AutoTrade_UI.COM;
+using Jubby_AutoTrade_UI.COMMON;
+using Jubby_AutoTrade_UI.GUI;
 using static Jubby_AutoTrade_UI.COMMON.Flag;
 
 namespace Jubby_AutoTrade_UI.SEQUENCE
@@ -34,14 +35,12 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
             Server = new TcpJsonServer();
             DataManager = new JubbyDataManager();
 
-            // [수정 1] 이벤트 구독은 프로그램 실행 시(생성자) 한 번만 등록하도록 이동
-            // Run() 안에 있으면 실행할 때마다 누적 등록되어 에러창이 여러 개 뜨는 버그가 발생함.
+            // 이벤트 구독은 프로그램 실행 시(생성자) 한 번만 등록
             Server.OnMessageReceived += DataManager.HandleMessage;
             Server.OnClientDisconnected += Server_OnClientDisconnected;
         }
 
         #region ## Event Handlers ##
-        // [수정 2] 통신 끊김 이벤트 로직 분리 및 UI 데드락 방지를 위한 BeginInvoke 사용
         private void Server_OnClientDisconnected(System.Net.Sockets.TcpClient c)
         {
             // 현재 자동매매 모드였다면 강제로 대기 모드로 전환
@@ -91,7 +90,6 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         //  STOP() — 전체 시스템 종료
         public void Stop()
         {
-            // [수정 3] 치명적 오타 수정: Running이 '아닐 때(!)' 리턴해야 함.
             if (!Running)
                 return;
 
@@ -100,14 +98,31 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
             // 1. 서버 정지
             Server.Stop();
 
-            // 💡 [핵심 추가] 2. 자동매매가 멈출 때 차트를 백업(저장)하라는 명령 전달!
-            // UI를 그리는 FormGraphic이 살아있는지(에러 방지) 확인한 후 안전하게 실행합니다.
+            // 💡 [에러 해결] 2. 자동매매가 멈출 때 차트를 백업(저장)하라는 명령 전달
             if (formGraphic != null && formGraphic.IsHandleCreated && !formGraphic.IsDisposed)
             {
                 formGraphic.BeginInvoke(new Action(() =>
                 {
-                    // FormGraphic에 구현해둔 그래프 데이터 추출 및 저장 함수 호출
-                    formGraphic.SaveInteractiveChart();
+                    try
+                    {
+                        // 1. Chart_Backups 라는 폴더가 없으면 만듭니다.
+                        string backupFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Chart_Backups");
+                        if (!Directory.Exists(backupFolder))
+                        {
+                            Directory.CreateDirectory(backupFolder);
+                        }
+
+                        // 2. 현재 시간을 넣어서 저장될 파일 이름을 만듭니다. (예: Jubby_Chart_20260323_203015.png)
+                        string fileName = $"Jubby_Chart_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+                        string fullPath = Path.Combine(backupFolder, fileName);
+
+                        // 3. 인수를 채워서 함수를 호출합니다!
+                        formGraphic.SaveInteractiveChart(fullPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[자동저장 오류] {ex.Message}");
+                    }
                 }));
             }
         }

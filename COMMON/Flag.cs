@@ -147,7 +147,7 @@ namespace Jubby_AutoTrade_UI.COMMON
         public class JubbyDataManager
         {
             /// 📚 종목별 보관소 (C#이 켜져 있는 동안 삼성전자, SK하이닉스 등의 데이터를 기억하는 장부입니다)
-            private Dictionary<string, JubbyStockInfo> _stocks = new Dictionary<string, JubbyStockInfo>();
+            private readonly Dictionary<string, JubbyStockInfo> _stocks = new Dictionary<string, JubbyStockInfo>();
 
             public string FirstSymbol { get; private set; } = null;
             public bool FirstDataReceived => FirstSymbol != null;

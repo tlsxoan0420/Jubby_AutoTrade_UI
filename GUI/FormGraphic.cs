@@ -1,13 +1,18 @@
 ﻿using Jubby_AutoTrade_UI.COMMON;
 using Jubby_AutoTrade_UI.SEQUENCE;
 using ScottPlot;
+using ScottPlot.Finance;
 using ScottPlot.Plottables;
 using ScottPlot.WinForms;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using static Jubby_AutoTrade_UI.COMMON.Flag;
 
@@ -15,366 +20,652 @@ namespace Jubby_AutoTrade_UI.GUI
 {
     public partial class FormGraphic : Form
     {
-        #region ## [1] 데이터 보관함 및 변수 설정 (Data Storage) ##
-
+        #region ## FormGraphic Define ##
         private FormsPlot FormsPlotMain;
+        private List<Flag.JubbyStockInfo> StockList = new List<Flag.JubbyStockInfo>();
+        private int CurrentIndex = 0;
 
-        /// <summary>
-        /// 💡 [핵심 해결책] 종목별 캔들(양초) 데이터 '개별 바구니'입니다.
-        /// "005930(삼성전자)"라는 이름표가 붙은 전용 리스트를 따로 관리하여 종목 캔들이 섞이는 것을 차단합니다.
-        /// </summary>
-        private Dictionary<string, List<OHLC>> StockDataBuckets = new Dictionary<string, List<OHLC>>();
+        // 💡 화면 렌더링용 임시 리스트
+        private readonly List<OHLC> OHLCList = new List<OHLC>();
+        private readonly List<double> OrderHistoryList = new List<double>();
 
-        /// <summary>
-        /// 🎯 [핵심 기능] 종목별 매수(BUY)/매도(SELL) 타점을 기억하는 마커 바구니입니다!
-        /// 데이터 구성: (시간[OADate], 가격, "BUY" or "SELL")
-        /// </summary>
-        private Dictionary<string, List<(double time, double price, string type)>> OrderMarkers = new Dictionary<string, List<(double time, double price, string type)>>();
+        private CandlestickPlot CandlePlot;
+        private BarPlot VolumePlot;
+        private Scatter BuyMarkers;
+        private Scatter SellMarkers;
 
-        /// <summary>
-        /// 📈 [신규 기능] 종목별 '평균 매입가(평단가)'를 기억하는 바구니입니다!
-        /// </summary>
-        private Dictionary<string, double> AveragePrices = new Dictionary<string, double>();
-
-        /// <summary>
-        /// 💡 현재 사용자가 화면으로 보고 있는 '종목 코드'입니다. (표에서 클릭한 종목)
-        /// </summary>
-        public string CurrentSelectedSymbol = "";
-
-        /// <summary>
-        /// 차트 초기 설정이 완료되었는지 확인하는 변수입니다.
-        /// </summary>
         private bool ChartInitialized = false;
+        private const int MaxBars = 500;
+        private bool firstSetDone = false;
 
-        /// <summary>
-        /// 종목당 최대 저장할 캔들 데이터 개수입니다. (최신 1000개 유지)
-        /// </summary>
-        private const int MaxBars = 1000;
+        private ContextMenuStrip CustomChartMenu;
 
-        /// <summary>
-        /// "새 데이터가 왔으니 현재 보고 있는 화면을 갱신해라!"라는 신호등입니다.
-        /// </summary>
-        private bool isDataUpdated = false;
-
-        #endregion
+        // 💡 [핵심 추가] "모든 종목"의 데이터를 독립적으로 보관하는 대형 금고
+        private bool isBackupMode = false;
+        private readonly Dictionary<string, List<OHLC>> LiveOHLCData = new Dictionary<string, List<OHLC>>();
+        private readonly Dictionary<string, List<double>> LiveVolumeData = new Dictionary<string, List<double>>();
+        private readonly Dictionary<string, List<OHLC>> BackupOHLCData = new Dictionary<string, List<OHLC>>();
+        private readonly Dictionary<string, List<double>> BackupVolumeData = new Dictionary<string, List<double>>();
+        #endregion ## FormGraphic Define ##
 
         public FormGraphic()
         {
             InitializeComponent();
-            UI_Organize(); // 차트 컨트롤 배치 및 기본 공사
+            UI_Organize();
         }
 
+        #region ## UI Organize ##
         private void UI_Organize()
         {
-            FormsPlotMain = new ScottPlot.WinForms.FormsPlot();
-            FormsPlotMain.Dock = DockStyle.Fill;
-            palGrapic1.Controls.Add(FormsPlotMain); // 패널에 차트 박기
-        }
+            this.KeyPreview = true;
+            this.KeyDown += FormStockChart_KeyDown;
 
+            FormsPlotMain = new ScottPlot.WinForms.FormsPlot
+            {
+                Dock = DockStyle.Fill
+            };
+            this.Controls.Add(FormsPlotMain);
+
+            FormsPlotMain.BringToFront();
+            FormsPlotMain.MouseDown += FormsPlotMain_MouseDown;
+            CreateCustomContextMenu();
+        }
+        #endregion ## UI Organize ##
+
+        #region ## FormGraphic Load ##
         private void FormGraphic_Load(object sender, EventArgs e)
         {
-            InitChart(); // 초기 디자인 설정
+            UI_Update();
+        }
+        #endregion ## FormGraphic Load ##
+
+        #region ## UI Update ##
+        private void UI_Update()
+        {
+            InitChart();
+        }
+        #endregion ## UI Update ##
+
+        #region ## Custom Context Menu & Backtest ##
+        private void CreateCustomContextMenu()
+        {
+            CustomChartMenu = new ContextMenuStrip();
+
+            ToolStripMenuItem itemSave = new ToolStripMenuItem("데이터 및 이미지 백업 저장");
+            itemSave.Click += (s, e) =>
+            {
+                using (SaveFileDialog sfd = new SaveFileDialog())
+                {
+                    sfd.Title = "차트 백업 저장 (PNG 및 CSV 자동생성)";
+                    sfd.Filter = "PNG 파일 (*.png)|*.png";
+                    sfd.FileName = $"Jubby_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.png";
+
+                    if (sfd.ShowDialog() == DialogResult.OK)
+                    {
+                        SaveInteractiveChart(sfd.FileName);
+                        MessageBox.Show("차트 이미지와 전체 종목 CSV 데이터가 함께 저장되었습니다.", "저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            };
+
+            ToolStripMenuItem itemAutoFit = new ToolStripMenuItem("자동 화면 맞춤 (Auto Fit)");
+            itemAutoFit.Click += (s, e) =>
+            {
+                FormsPlotMain.Plot.Axes.AutoScale();
+                FormsPlotMain.Refresh();
+            };
+
+            ToolStripMenuItem itemLoadBackup = new ToolStripMenuItem("백업 데이터 불러오기 (Load CSV)");
+            itemLoadBackup.Click += LoadBackupData_Click;
+
+            // =====================================================================
+            // 🚀 [핵심 추가] C# 가상 백테스트 (과거 데이터 시뮬레이터)
+            // =====================================================================
+            ToolStripMenuItem itemBacktest = new ToolStripMenuItem("📊 [AI 시뮬레이션] 가상 백테스트 돌리기");
+            itemBacktest.Click += (s, e) =>
+            {
+                if (!isBackupMode || BackupOHLCData.Count == 0)
+                {
+                    MessageBox.Show("먼저 '백업 데이터 불러오기'로 CSV 파일을 열어주세요!", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                RunVirtualBacktest();
+            };
+
+            CustomChartMenu.Items.Add(itemSave);
+            CustomChartMenu.Items.Add(itemAutoFit);
+            CustomChartMenu.Items.Add(new ToolStripSeparator());
+            CustomChartMenu.Items.Add(itemLoadBackup);
+            CustomChartMenu.Items.Add(new ToolStripSeparator());
+            CustomChartMenu.Items.Add(itemBacktest); // 우클릭 메뉴에 백테스트 추가!
         }
 
-        #region ## [2] 차트 초기 디자인 설정 (시간 표시) ##
+        // 💡 [핵심 기능] 영수증을 출력해주는 가상 시뮬레이터 로직
+        private void RunVirtualBacktest()
+        {
+            double starting_capital = 10000000; // 원금 1,000만 원 세팅
+            double current_capital = starting_capital;
+            int total_trades = 0;
+            int win_trades = 0;
+            int loss_trades = 0;
+
+            // 로드된 전체 종목을 대상으로 가상 매매를 진행합니다.
+            foreach (var symbol in BackupOHLCData.Keys)
+            {
+                var ohlc = BackupOHLCData[symbol];
+                bool is_holding = false;
+                double buy_price = 0;
+
+                for (int i = 20; i < ohlc.Count; i++) // 20봉 이후부터 분석 시작
+                {
+                    var c = ohlc[i];
+                    var prev = ohlc[i - 1];
+
+                    // (가상 룰) 20일 이평선 돌파 시 매수, 2.5% 익절 / -1.5% 손절
+                    double ma20 = ohlc.Skip(i - 20).Take(20).Average(x => x.Close);
+
+                    if (!is_holding)
+                    {
+                        if (prev.Close < ma20 && c.Close > ma20) // 골든크로스 매수
+                        {
+                            is_holding = true;
+                            buy_price = c.Close;
+                        }
+                    }
+                    else
+                    {
+                        double profit_rate = ((c.Close - buy_price) / buy_price) * 100;
+                        if (profit_rate >= 2.5 || profit_rate <= -1.5) // 목표가/손절가 도달
+                        {
+                            total_trades++;
+                            if (profit_rate > 0) win_trades++;
+                            else loss_trades++;
+
+                            // 원금의 10%를 투자했다고 가정하고 수익금 합산
+                            double invest_amt = current_capital * 0.1;
+                            current_capital += invest_amt * (profit_rate / 100.0);
+
+                            is_holding = false;
+                        }
+                    }
+                }
+            }
+
+            // 결과 계산 및 영수증(리포트) 생성
+            double total_profit = current_capital - starting_capital;
+            double win_rate = total_trades > 0 ? ((double)win_trades / total_trades) * 100 : 0;
+
+            string report = $"📊 [주삐 AI 백테스트 결과 영수증] 📊\n\n" +
+                            $"💰 초기 자본금: {starting_capital:N0} 원\n" +
+                            $"💵 최종 자본금: {current_capital:N0} 원\n" +
+                            $"📈 순수익금: {total_profit:N0} 원\n\n" +
+                            $"🔄 총 매매 횟수: {total_trades} 번\n" +
+                            $"👑 승률: {win_rate:F1}%\n" +
+                            $"🟢 익절: {win_trades} 번 / 🔴 손절: {loss_trades} 번";
+
+            MessageBox.Show(report, "백테스트 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void FormsPlotMain_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right && (Control.ModifierKeys & Keys.Control) == Keys.Control)
+            {
+                CustomChartMenu.Show(FormsPlotMain, e.Location);
+            }
+        }
+
+        private void LoadBackupData_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog ofd = new OpenFileDialog())
+            {
+                ofd.Title = "백업 차트 데이터 불러오기";
+                ofd.Filter = "CSV 파일 (*.csv)|*.csv";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        string[] lines = File.ReadAllLines(ofd.FileName, Encoding.UTF8);
+                        if (lines.Length <= 1)
+                        {
+                            MessageBox.Show("데이터가 부족하거나 잘못된 파일입니다.", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        BackupOHLCData.Clear();
+                        BackupVolumeData.Clear();
+                        var parsedOrders = new Dictionary<string, List<Flag.TradeOrderData>>();
+
+                        for (int i = 1; i < lines.Length; i++)
+                        {
+                            if (string.IsNullOrWhiteSpace(lines[i])) continue;
+                            string[] cols = lines[i].Split(',');
+
+                            if (cols.Length >= 6)
+                            {
+                                string symbol = cols[0].Trim();
+                                if (DateTime.TryParse(cols[1].Trim(), out DateTime time))
+                                {
+                                    double.TryParse(cols[2], out double open);
+                                    double.TryParse(cols[3], out double high);
+                                    double.TryParse(cols[4], out double low);
+                                    double.TryParse(cols[5], out double close);
+
+                                    double volume = 0;
+                                    string orderType = "";
+
+                                    if (cols.Length > 6)
+                                    {
+                                        string val = cols[6].Trim();
+                                        if (double.TryParse(val, out double v)) volume = v;
+                                        else orderType = val;
+                                    }
+
+                                    if (open == 0 && close == 0) continue;
+
+                                    if (!BackupOHLCData.ContainsKey(symbol))
+                                    {
+                                        BackupOHLCData[symbol] = new List<OHLC>();
+                                        BackupVolumeData[symbol] = new List<double>();
+                                        parsedOrders[symbol] = new List<Flag.TradeOrderData>();
+                                    }
+
+                                    // 중복 시간 데이터 건너뛰기
+                                    if (BackupOHLCData[symbol].Any(x => x.DateTime == time)) continue;
+
+                                    BackupOHLCData[symbol].Add(new OHLC(open, high, low, close, time, TimeSpan.FromMinutes(1)));
+                                    BackupVolumeData[symbol].Add(volume);
+
+                                    if (!string.IsNullOrEmpty(orderType))
+                                    {
+                                        parsedOrders[symbol].Add(new Flag.TradeOrderData
+                                        {
+                                            Order_Type = orderType,
+                                            Order_Price = (decimal)close,
+                                            Order_Time = time.ToString("yyyy-MM-dd HH:mm:00")
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        if (BackupOHLCData.Count == 0) return;
+
+                        isBackupMode = true;
+                        var newStockList = new List<Flag.JubbyStockInfo>();
+
+                        foreach (var symbol in BackupOHLCData.Keys)
+                        {
+                            string realName = symbol;
+                            var existingStock = Auto.Ins.GetStock(symbol);
+                            if (existingStock != null && !string.IsNullOrWhiteSpace(existingStock.Name))
+                                realName = existingStock.Name;
+
+                            var stock = new Flag.JubbyStockInfo(symbol, realName);
+
+                            CalculateIndicators(stock, BackupOHLCData[symbol], BackupVolumeData[symbol]);
+
+                            if (parsedOrders.ContainsKey(symbol))
+                                foreach (var order in parsedOrders[symbol])
+                                    stock.AddOrder(order);
+
+                            newStockList.Add(stock);
+                            Auto.Ins.formDataChart?.SafeApplyStockUpdate(stock, Flag.UpdateTarget.All);
+                        }
+
+                        var bestSymbol = BackupOHLCData.OrderByDescending(x => x.Value.Count).First().Key;
+                        this.StockList = newStockList;
+                        this.CurrentIndex = newStockList.FindIndex(x => x.Symbol == bestSymbol);
+
+                        LoadChart(this.StockList[this.CurrentIndex]);
+
+                        MessageBox.Show($"총 {newStockList.Count}개의 종목을 추출하여\n실제 매매 표와 차트로 완벽하게 복원했습니다.", "복원 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"오류 발생: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private void CalculateIndicators(Flag.JubbyStockInfo stock, List<OHLC> ohlcList, List<double> volList)
+        {
+            if (ohlcList.Count == 0) return;
+            var last = ohlcList.Last();
+            double lastClose = last.Close;
+            double lastVol = volList.Last();
+
+            stock.Market.Open_Price = (decimal)last.Open;
+            stock.Market.High_Price = (decimal)last.High;
+            stock.Market.Low_Price = (decimal)last.Low;
+            stock.Market.Last_Price = (decimal)lastClose;
+            stock.Market.Volume = (decimal)lastVol;
+
+            if (ohlcList.Count > 1)
+            {
+                double prevClose = ohlcList[ohlcList.Count - 2].Close;
+                stock.Market.Return_1m = prevClose > 0 ? (decimal)((lastClose - prevClose) / prevClose * 100.0) : 0m;
+            }
+            else if (last.Open > 0)
+            {
+                stock.Market.Return_1m = (decimal)((lastClose - last.Open) / last.Open * 100.0);
+            }
+
+            stock.Market.Trade_Amount = (decimal)(lastClose * lastVol / 1000000.0);
+
+            if (volList.Count >= 5)
+            {
+                double volMa5 = volList.Skip(volList.Count - 5).Take(5).Average();
+                stock.Market.Vol_Energy = volMa5 > 0 ? (decimal)(lastVol / volMa5) : 1m;
+            }
+
+            if (ohlcList.Count >= 5)
+            {
+                stock.Strategy.Ma_5 = (decimal)ohlcList.Skip(ohlcList.Count - 5).Take(5).Average(x => x.Close);
+            }
+
+            if (ohlcList.Count >= 20)
+            {
+                double ma20 = ohlcList.Skip(ohlcList.Count - 20).Take(20).Average(x => x.Close);
+                stock.Strategy.Ma_20 = (decimal)ma20;
+                stock.Market.Disparity = ma20 > 0 ? (decimal)(lastClose / ma20 * 100.0) : 100m;
+            }
+
+            if (ohlcList.Count > 14)
+            {
+                double sumGain = 0, sumLoss = 0;
+                for (int i = ohlcList.Count - 14; i < ohlcList.Count; i++)
+                {
+                    double diff = ohlcList[i].Close - ohlcList[i - 1].Close;
+                    if (diff > 0) sumGain += diff;
+                    else sumLoss -= diff;
+                }
+                double avgLoss = sumLoss / 14.0;
+                if (avgLoss == 0) stock.Strategy.RSI = 100m;
+                else stock.Strategy.RSI = (decimal)(100.0 - (100.0 / (1.0 + (sumGain / 14.0) / avgLoss)));
+            }
+
+            if (ohlcList.Count > 26)
+            {
+                double ema12 = ohlcList.First().Close;
+                double ema26 = ohlcList.First().Close;
+                foreach (var c in ohlcList.Skip(1))
+                {
+                    ema12 = c.Close * (2.0 / 13.0) + ema12 * (1 - (2.0 / 13.0));
+                    ema26 = c.Close * (2.0 / 27.0) + ema26 * (1 - (2.0 / 27.0));
+                }
+                stock.Strategy.MACD = (decimal)(ema12 - ema26);
+            }
+
+            stock.Strategy.Signal = "백업/복원";
+        }
+
+        private void ReDrawChartComplete()
+        {
+            if (OHLCList.Count == 0) return;
+
+            if (CandlePlot != null) FormsPlotMain.Plot.Remove(CandlePlot);
+            CandlePlot = FormsPlotMain.Plot.Add.Candlestick(OHLCList.ToArray());
+
+            if (VolumePlot != null) FormsPlotMain.Plot.Remove(VolumePlot);
+            VolumePlot = FormsPlotMain.Plot.Add.Bars(OrderHistoryList.ToArray());
+
+            foreach (var bar in VolumePlot.Bars)
+            {
+                bar.FillColor = ScottPlot.Colors.Blue.WithAlpha(0.3);
+                bar.LineWidth = 0;
+            }
+        }
+        #endregion ## Custom Context Menu & Backtest ##
+
+        #region ## Graphic Event ##
+
+        internal void SetStockList(List<Flag.JubbyStockInfo> list)
+        {
+            StockList = list ?? new List<Flag.JubbyStockInfo>();
+            CurrentIndex = 0;
+            if (StockList.Count > 0) LoadChart(StockList[CurrentIndex]);
+        }
+
+        public void ShowStock(string symbol)
+        {
+            if (StockList == null || StockList.Count == 0) return;
+            int idx = StockList.FindIndex(s => s.Symbol == symbol);
+            if (idx == -1) return;
+            CurrentIndex = idx;
+            LoadChart(StockList[CurrentIndex]);
+        }
 
         private void InitChart()
         {
             var plt = FormsPlotMain.Plot;
+            FormsPlotMain.Menu?.Clear();
 
-            // 💡 [영어 표기] 한글 깨짐 방지를 위해 영문 레이블을 사용합니다.
-            plt.Title("Jubby AI Real-time Market Chart");
-            plt.YLabel("Price (KRW)");
-
-            // ✨ [X축 해결] X축을 단순 숫자가 아닌 '실제 시간(DateTime)' 포맷으로 그립니다!
             plt.Axes.DateTimeTicksBottom();
-
+            plt.Title("JUBBY STOCK CHART (데이터 대기 중...)");
+            plt.YLabel("Price");
             ChartInitialized = true;
         }
 
-        #endregion
-
-        #region ## [3] 실시간 데이터 캔들 & 마커 그리기 (종목 독립 관리) ##
-
-        /// <summary>
-        /// 📡 파이썬에서 시세 데이터(market)가 오면 호출됩니다.
-        /// 종목별 바구니에 캔들을 나누어 담습니다.
-        /// </summary>
-        internal void UpdateMarketData(Flag.JubbyStockInfo info)
+        internal void LoadChart(Flag.JubbyStockInfo info)
         {
-            if (this.InvokeRequired)
-            {
-                this.BeginInvoke(new Action(() => UpdateMarketData(info)));
-                return;
-            }
-
             if (!ChartInitialized) InitChart();
 
-            // 1. [바구니 생성] 이 종목의 바구니가 없다면 새로 만들어줍니다.
-            if (!StockDataBuckets.ContainsKey(info.Symbol))
+            OHLCList.Clear();
+            OrderHistoryList.Clear();
+
+            if (isBackupMode && BackupOHLCData.ContainsKey(info.Symbol))
             {
-                StockDataBuckets[info.Symbol] = new List<OHLC>();
+                OHLCList.AddRange(BackupOHLCData[info.Symbol]);
+                OrderHistoryList.AddRange(BackupVolumeData[info.Symbol]);
+            }
+            else if (!isBackupMode && LiveOHLCData.ContainsKey(info.Symbol))
+            {
+                OHLCList.AddRange(LiveOHLCData[info.Symbol]);
+                OrderHistoryList.AddRange(LiveVolumeData[info.Symbol]);
             }
 
-            // 💡 [신규] 파이썬에서 넘어온 '평균 매입가'를 전용 바구니에 업데이트합니다.
-            if (info.MyAccount != null)
-            {
-                AveragePrices[info.Symbol] = (double)info.MyAccount.Avg_Price;
-            }
+            ReDrawChartComplete();
+            UpdateOrderMarkers(info.GetOrderListSafe());
 
-            // =========================================================================
-            // 💡 [문제 해결] 파이썬에서 데이터 누락/0원 수신 시 캔들 찌그러짐 방지 로직
-            // =========================================================================
-            double open = (double)info.Market.Open_Price;
-            double high = (double)info.Market.High_Price;
-            double low = (double)info.Market.Low_Price;
-            double close = (double)info.Market.Last_Price; // 현재가
-
-            // 파이썬에서 시가/고가/저가를 0으로 보냈다면, 전부 '현재가'로 통일하여 'ㅡ' 모양 캔들 생성
-            if (open == 0) open = close;
-            if (high == 0) high = close;
-            if (low == 0) low = close;
-
-            // 차트 라이브러리의 엄격한 규칙(고가가 제일 커야 함 등) 강제 만족
-            high = Math.Max(high, Math.Max(open, close));
-            low = Math.Min(low, Math.Min(open, close));
-
-            // 2. [데이터 포장] 현재 '진짜 컴퓨터 시간'을 사용하여 1분짜리 캔들을 만듭니다.
-            var ohlc = new OHLC(
-                open,
-                high,
-                low,
-                close,
-                DateTime.Now, // 💡 현재 진짜 시간 사용
-                TimeSpan.FromMinutes(1) // 1분봉 두께
-            );
-
-            // 3. [개별 바구니에 저장] 섞이지 않게 이 종목 전용 리스트에만 넣습니다.
-            var myBucket = StockDataBuckets[info.Symbol];
-            myBucket.Add(ohlc);
-            if (myBucket.Count > MaxBars) myBucket.RemoveAt(0);
-
-            // 4. [신호등 켜기] 지금 화면에 띄워둔 종목의 데이터가 왔다면 화면 갱신 예약!
-            if (CurrentSelectedSymbol == info.Symbol)
-            {
-                isDataUpdated = true;
-            }
+            FormsPlotMain.Plot.Title($"JUBBY STOCK CHART - [{info.Name}]");
+            FormsPlotMain.Plot.Axes.AutoScale();
+            FormsPlotMain.Refresh();
         }
 
-        /// <summary>
-        /// 🎯 [핵심 기능] 파이썬에서 매수/매도를 때리면 그 흔적(타점)을 기록합니다!
-        /// (과거 데이터 복원 시, 파이썬이 보내준 과거 시간을 반영하여 정확한 위치에 찍습니다.)
-        /// </summary>
-        public void AddOrderMarker(string symbol, string type, double price, string timeStr = "")
+        private void UpdateOrderMarkers(List<Flag.TradeOrderData> orders)
         {
-            if (string.IsNullOrWhiteSpace(symbol)) return;
+            var buyX = new List<double>(); var buyY = new List<double>();
+            var sellX = new List<double>(); var sellY = new List<double>();
 
-            if (!OrderMarkers.ContainsKey(symbol))
-                OrderMarkers[symbol] = new List<(double, double, string)>();
+            if (orders == null) orders = new List<Flag.TradeOrderData>();
 
-            // 💡 [과거 시간 복원] 파이썬에서 넘어온 "2026-03-20 13:07:59" 같은 문자열을 진짜 시간으로 변환
-            DateTime orderTime = DateTime.Now;
-            if (!string.IsNullOrEmpty(timeStr))
+            foreach (var o in orders)
             {
-                DateTime.TryParse(timeStr, out orderTime);
+                if (!DateTime.TryParse(o.Order_Time, out DateTime dt)) continue;
+
+                double x = dt.ToOADate(); double y = (double)o.Order_Price;
+                if (o.Order_Type.Equals("BUY", StringComparison.OrdinalIgnoreCase)) { buyX.Add(x); buyY.Add(y); }
+                else if (o.Order_Type.Equals("SELL_PROFIT", StringComparison.OrdinalIgnoreCase) || o.Order_Type.Equals("SELL_LOSS", StringComparison.OrdinalIgnoreCase)) { sellX.Add(x); sellY.Add(y); }
             }
 
-            double oaDate = orderTime.ToOADate();
-
-            // 💡 [중복 점 찍기 방지] 이미 그 시간에 똑같은 화살표가 그려져 있다면 무시합니다.
-            bool isExist = OrderMarkers[symbol].Any(m => m.time == oaDate && m.type == type);
-            if (!isExist)
+            if (BuyMarkers != null) FormsPlotMain.Plot.Remove(BuyMarkers);
+            if (buyX.Count > 0)
             {
-                OrderMarkers[symbol].Add((oaDate, price, type));
-                if (CurrentSelectedSymbol == symbol) isDataUpdated = true;
+                BuyMarkers = FormsPlotMain.Plot.Add.Scatter(buyX.ToArray(), buyY.ToArray());
+                BuyMarkers.Color = ScottPlot.Colors.Lime; BuyMarkers.MarkerShape = MarkerShape.FilledTriangleDown;
+                BuyMarkers.MarkerSize = 8; BuyMarkers.LineWidth = 0;
             }
+            else { BuyMarkers = null; }
+
+            if (SellMarkers != null) FormsPlotMain.Plot.Remove(SellMarkers);
+            if (sellX.Count > 0)
+            {
+                SellMarkers = FormsPlotMain.Plot.Add.Scatter(sellX.ToArray(), sellY.ToArray());
+                SellMarkers.Color = ScottPlot.Colors.Red; SellMarkers.MarkerShape = MarkerShape.FilledTriangleUp;
+                SellMarkers.MarkerSize = 8; SellMarkers.LineWidth = 0;
+            }
+            else { SellMarkers = null; }
         }
+        #endregion ## Graphic Event ##
 
-        /// <summary>
-        /// 🎨 실제로 현재 선택된 종목의 캔들 + 매매 마커(점) + 평단가 선을 도화지에 그려냅니다.
-        /// </summary>
-        internal void LoadChart(string symbol)
+        #region ## UI Event ##
+        private void FormStockChart_KeyDown(object sender, KeyEventArgs e)
         {
-            var plt = FormsPlotMain.Plot;
-            plt.Clear(); // 화면 깨끗이 비우기
-
-            // 🕯️ 1. 캔들(양초) 그리기
-            if (StockDataBuckets.ContainsKey(symbol))
-            {
-                var myBucket = StockDataBuckets[symbol];
-                if (myBucket.Count > 0)
-                {
-                    var candlePlot = plt.Add.Candlestick(myBucket);
-                }
-            }
-
-            // 🎯 2. 매매 타점(마커) 그리기 (3색상 분리 완벽 적용)
-            if (OrderMarkers.ContainsKey(symbol))
-            {
-                var markers = OrderMarkers[symbol];
-
-                // 🔵 BUY(매수) 타점 그리기: 파란색 위쪽 화살표(▲)
-                var buyMarkers = markers.Where(m => m.type == "BUY").ToList();
-                if (buyMarkers.Count > 0)
-                {
-                    double[] buyX = buyMarkers.Select(m => m.time).ToArray();
-                    double[] buyY = buyMarkers.Select(m => m.price).ToArray();
-                    var spBuy = plt.Add.Scatter(buyX, buyY);
-                    spBuy.LineStyle.Width = 0; // 선으로 잇지 않음
-                    spBuy.MarkerStyle.Shape = MarkerShape.FilledTriangleUp;
-                    spBuy.MarkerStyle.Size = 15;
-                    spBuy.MarkerStyle.FillColor = Colors.Blue;
-                }
-
-                // 🟢 SELL_PROFIT(익절) 타점 그리기: 라임색 아래쪽 화살표(▼)
-                var profitMarkers = markers.Where(m => m.type == "SELL_PROFIT").ToList();
-                if (profitMarkers.Count > 0)
-                {
-                    double[] sellX = profitMarkers.Select(m => m.time).ToArray();
-                    double[] sellY = profitMarkers.Select(m => m.price).ToArray();
-                    var spSellProfit = plt.Add.Scatter(sellX, sellY);
-                    spSellProfit.LineStyle.Width = 0;
-                    spSellProfit.MarkerStyle.Shape = MarkerShape.FilledTriangleDown;
-                    spSellProfit.MarkerStyle.Size = 15;
-                    spSellProfit.MarkerStyle.FillColor = Colors.Lime;
-                }
-
-                // 🔴 SELL_LOSS(손절 및 기타매도) 타점 그리기: 빨간색 아래쪽 화살표(▼)
-                var lossMarkers = markers.Where(m => m.type == "SELL_LOSS" || m.type == "SELL").ToList();
-                if (lossMarkers.Count > 0)
-                {
-                    double[] sellX = lossMarkers.Select(m => m.time).ToArray();
-                    double[] sellY = lossMarkers.Select(m => m.price).ToArray();
-                    var spSellLoss = plt.Add.Scatter(sellX, sellY);
-                    spSellLoss.LineStyle.Width = 0;
-                    spSellLoss.MarkerStyle.Shape = MarkerShape.FilledTriangleDown;
-                    spSellLoss.MarkerStyle.Size = 15;
-                    spSellLoss.MarkerStyle.FillColor = Colors.Red;
-                }
-            }
-
-            // 📈 3. 평균 매입가(평단가) 선 그리기 [신규 기능!]
-            if (AveragePrices.ContainsKey(symbol))
-            {
-                double avgPrice = AveragePrices[symbol];
-
-                // 평단가가 0보다 클 때(즉, 진짜 보유하고 있을 때)만 그립니다.
-                if (avgPrice > 0)
-                {
-                    var hline = plt.Add.HorizontalLine(avgPrice);
-                    hline.LineStyle.Color = Colors.Magenta;            // 강렬한 마젠타(분홍) 색상
-                    hline.LineStyle.Width = 2;                         // 두께 2
-                    hline.LineStyle.Pattern = LinePattern.Dashed;      // 점선으로 표시하여 캔들과 구분
-                }
-            }
-
-            // 화면 크기에 맞게 자동 줌 인!
-            plt.Axes.AutoScale();
-            FormsPlotMain.Refresh(); // 최종 렌더링
+            if (e.Control && e.KeyCode == Keys.Left) MovePrevStock();
+            else if (e.Control && e.KeyCode == Keys.Right) MoveNextStock();
         }
-
-        #endregion
-
-        #region ## [4] 종목 전환 및 외부 통신 (Interface) ##
-
-        /// <summary>
-        /// 표(DataGrid)에서 종목을 클릭했을 때 호출되어 차트를 싹 바꿔줍니다.
-        /// </summary>
-        public void ShowStock(string symbol)
+        private void MovePrevStock()
         {
-            if (string.IsNullOrWhiteSpace(symbol)) return;
-
-            CurrentSelectedSymbol = symbol; // "이제 이 종목만 보여줘" 라고 설정
-            LoadChart(symbol); // 즉시 화면 갱신
+            if (StockList == null || StockList.Count == 0 || CurrentIndex <= 0) return;
+            CurrentIndex--;
+            LoadChart(StockList[CurrentIndex]);
         }
+        private void MoveNextStock()
+        {
+            if (StockList == null || StockList.Count == 0 || CurrentIndex >= StockList.Count - 1) return;
+            CurrentIndex++;
+            LoadChart(StockList[CurrentIndex]);
+        }
+        #endregion ## UI Event ##
 
+        #region ## Timer Event ##
         private void timer1_Tick(object sender, EventArgs e)
         {
-            // 타이머가 돌다가 업데이트 신호(isDataUpdated)가 켜져 있으면 화면을 갱신합니다.
-            if (isDataUpdated && !string.IsNullOrEmpty(CurrentSelectedSymbol))
+            if (!Auto.Ins.DataManager.FirstDataReceived) return;
+            if (!firstSetDone)
             {
-                LoadChart(CurrentSelectedSymbol);
-                isDataUpdated = false; // 신호등 끄기
+                firstSetDone = true;
+                string firstSymbol = Auto.Ins.DataManager.FirstSymbol;
+                var firstInfo = Auto.Ins.GetStock(firstSymbol);
+                if (firstInfo != null) SetStockList(new List<JubbyStockInfo> { firstInfo });
+                return;
+            }
+            if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count) return;
+
+            string symbol = StockList[CurrentIndex].Symbol;
+            var info = Auto.Ins.GetStock(symbol);
+            if (info == null) return;
+
+            if (!isBackupMode) LoadChart(info);
+        }
+        #endregion ## Timer Event ##
+
+        #region ## 외부 호출 및 데이터 수신용 ##
+
+        internal void UpdateMarketData(Flag.JubbyStockInfo info)
+        {
+            isBackupMode = false;
+            if (info == null || info.Market == null) return;
+
+            string sym = info.Symbol;
+            if (!LiveOHLCData.ContainsKey(sym))
+            {
+                LiveOHLCData[sym] = new List<OHLC>();
+                LiveVolumeData[sym] = new List<double>();
+            }
+
+            var m = info.Market;
+            if (m.Open_Price > 0 && m.Last_Price > 0)
+            {
+                DateTime now = DateTime.Now;
+                DateTime minuteTime = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0);
+
+                var ohlcList = LiveOHLCData[sym];
+                var volList = LiveVolumeData[sym];
+
+                if (ohlcList.Count > 0 && ohlcList.Last().DateTime == minuteTime)
+                {
+                    var last = ohlcList.Last();
+                    last.High = Math.Max(last.High, (double)m.High_Price);
+                    last.Low = Math.Min(last.Low, (double)m.Low_Price);
+                    last.Close = (double)m.Last_Price;
+                    volList[volList.Count - 1] = (double)m.Volume;
+                }
+                else
+                {
+                    ohlcList.Add(new OHLC((double)m.Open_Price, (double)m.High_Price, (double)m.Low_Price, (double)m.Last_Price, minuteTime, TimeSpan.FromMinutes(1)));
+                    volList.Add((double)m.Volume);
+
+                    if (ohlcList.Count > MaxBars) ohlcList.RemoveAt(0);
+                    if (volList.Count > MaxBars) volList.RemoveAt(0);
+                }
+            }
+
+            if (StockList != null && StockList.Count > 0 && CurrentIndex < StockList.Count)
+            {
+                if (StockList[CurrentIndex].Symbol == sym)
+                {
+                    LoadChart(info);
+                }
             }
         }
 
-        #endregion
-
-        #region ## [5] 자동매매 종료 시 차트 데이터 백업 (CSV 추출) ##
-        /// <summary>
-        /// 💡 Auto.cs에서 Stop()이 불릴 때 실행됩니다.
-        /// 지금까지 모인 캔들(OHLC)과 매매 타점(마커) 데이터를 나중에 분석할 수 있도록
-        /// 엑셀(CSV) 파일로 예쁘게 뽑아서 저장합니다.
-        /// </summary>
-        public void SaveInteractiveChart()
+        internal void AddOrderMarker(string symbol, string orderType, decimal price, string time)
         {
+            if (string.IsNullOrEmpty(symbol)) return;
+            if (StockList != null && StockList.Count > 0 && CurrentIndex < StockList.Count)
+            {
+                if (StockList[CurrentIndex].Symbol == symbol)
+                {
+                    var info = StockList[CurrentIndex];
+                    Flag.TradeOrderData newOrder = new Flag.TradeOrderData
+                    {
+                        Order_Type = orderType,
+                        Order_Price = price,
+                        Order_Time = time
+                    };
+
+                    info.AddOrder(newOrder);
+                    UpdateOrderMarkers(info.GetOrderListSafe());
+                    FormsPlotMain.Refresh();
+                }
+            }
+        }
+
+        internal void SaveInteractiveChart(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return;
             try
             {
-                // 1. 저장할 폴더 만들기 (프로그램 폴더 안의 ChartDataBackup 폴더)
-                string timeStamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                string directoryPath = Path.Combine(Application.StartupPath, "ChartDataBackup");
-                if (!Directory.Exists(directoryPath))
+                FormsPlotMain.Plot.SavePng(filePath, 1200, 800);
+
+                string csvPath = filePath.Replace(".png", ".csv");
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine("종목코드,시간,시가,고가,저가,종가,거래발생(타점)");
+
+                foreach (var symbol in LiveOHLCData.Keys)
                 {
-                    Directory.CreateDirectory(directoryPath);
-                }
+                    var ohlcList = LiveOHLCData[symbol];
+                    var volList = LiveVolumeData[symbol];
+                    var stockInfo = Auto.Ins.GetStock(symbol);
+                    var orders = stockInfo?.GetOrderListSafe() ?? new List<Flag.TradeOrderData>();
 
-                string csvFilePath = Path.Combine(directoryPath, $"Jubby_TradeRecord_{timeStamp}.csv");
-
-                // 2. CSV 파일 쓰기 시작 (BOM을 추가하여 한글 깨짐 방지)
-                using (StreamWriter writer = new StreamWriter(csvFilePath, false, new UTF8Encoding(true)))
-                {
-                    // 헤더(열 이름) 작성
-                    writer.WriteLine("종목코드,시간,시가,고가,저가,종가,거래발생(타점)");
-
-                    // 3. 기록된 모든 종목의 캔들을 뒤지면서 기록
-                    foreach (var bucket in StockDataBuckets)
+                    for (int i = 0; i < ohlcList.Count; i++)
                     {
-                        string symbol = bucket.Key;
-                        List<OHLC> candles = bucket.Value;
+                        var c = ohlcList[i];
+                        double v = volList.Count > i ? volList[i] : 0;
 
-                        // 이 종목의 매매 타점(마커)이 있는지 확인
-                        bool hasMarkers = OrderMarkers.ContainsKey(symbol);
-                        List<(double time, double price, string type)> markers = hasMarkers ? OrderMarkers[symbol] : null;
+                        string orderStr = "";
+                        var timeMatch = orders.FirstOrDefault(o => {
+                            if (DateTime.TryParse(o.Order_Time, out DateTime odt))
+                                return odt.ToString("yyyy-MM-dd HH:mm") == c.DateTime.ToString("yyyy-MM-dd HH:mm");
+                            return false;
+                        });
 
-                        foreach (var c in candles)
-                        {
-                            // 현재 캔들의 시간에 매수/매도 마커가 찍혀있는지 확인
-                            string tradeAction = "";
-                            if (hasMarkers)
-                            {
-                                // OADate를 DateTime으로 변환하여 시간 비교 (초 단위까지만 비교)
-                                var markerInThisCandle = markers.FirstOrDefault(m =>
-                                    DateTime.FromOADate(m.time).ToString("HH:mm:ss") == c.DateTime.ToString("HH:mm:ss"));
+                        if (timeMatch != null) orderStr = timeMatch.Order_Type;
 
-                                if (markerInThisCandle.type != null)
-                                {
-                                    tradeAction = markerInThisCandle.type; // "BUY" 또는 "SELL_PROFIT", "SELL_LOSS" 기록
-                                }
-                            }
-
-                            // CSV 한 줄 만들기
-                            string line = $"{symbol},{c.DateTime:yyyy-MM-dd HH:mm:ss},{c.Open},{c.High},{c.Low},{c.Close},{tradeAction}";
-                            writer.WriteLine(line);
-                        }
+                        sb.AppendLine($"{symbol},{c.DateTime:yyyy-MM-dd HH:mm:00},{c.Open},{c.High},{c.Low},{c.Close},{orderStr}");
                     }
                 }
-
-                // UI 스레드에서 메시지박스 띄우기
-                this.BeginInvoke(new Action(() =>
-                {
-                    MessageBox.Show($"📈 딥러닝 복기용 차트 데이터가 성공적으로 백업되었습니다!\n\n저장 경로:\n{csvFilePath}",
-                                    "차트 데이터 백업 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }));
+                File.WriteAllText(csvPath, sb.ToString(), Encoding.UTF8);
             }
             catch (Exception ex)
             {
-                this.BeginInvoke(new Action(() =>
-                {
-                    MessageBox.Show($"차트 데이터를 저장하는 중 에러가 발생했습니다.\n{ex.Message}",
-                                    "저장 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }));
+                Console.WriteLine($"[차트 저장 오류] {ex.Message}");
             }
         }
-        #endregion
+        #endregion ## 외부 호출용 ##
     }
 }

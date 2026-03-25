@@ -145,7 +145,7 @@ namespace Jubby_AutoTrade_UI.GUI
                             if (existingStock != null && !string.IsNullOrWhiteSpace(existingStock.Name)) realName = existingStock.Name;
                             var stock = new Flag.JubbyStockInfo(symbol, realName); CalculateIndicators(stock, BackupOHLCData[symbol], BackupVolumeData[symbol]);
                             if (parsedOrders.ContainsKey(symbol)) foreach (var order in parsedOrders[symbol]) stock.AddOrder(order);
-                            newStockList.Add(stock); Auto.Ins.formDataChart?.SafeApplyStockUpdate(stock, Flag.UpdateTarget.All);
+                            newStockList.Add(stock);
                         }
                         var bestSymbol = BackupOHLCData.OrderByDescending(x => x.Value.Count).First().Key; this.StockList = newStockList; this.CurrentIndex = newStockList.FindIndex(x => x.Symbol == bestSymbol);
                         LoadChart(this.StockList[this.CurrentIndex]); MessageBox.Show($"총 {newStockList.Count}개의 종목을 추출하여\n실제 매매 표와 차트로 완벽하게 복원했습니다.", "복원 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -246,13 +246,52 @@ namespace Jubby_AutoTrade_UI.GUI
         private void MovePrevStock() { if (StockList == null || StockList.Count == 0 || CurrentIndex <= 0) return; CurrentIndex--; LoadChart(StockList[CurrentIndex]); }
         private void MoveNextStock() { if (StockList == null || StockList.Count == 0 || CurrentIndex >= StockList.Count - 1) return; CurrentIndex++; LoadChart(StockList[CurrentIndex]); }
 
+        /// <summary>
+        /// [타이머 이벤트] 실시간으로 차트를 갱신하거나 초기 데이터를 세팅합니다.
+        /// </summary>
         private void timer1_Tick(object sender, EventArgs e)
         {
-            if (!Auto.Ins.DataManager.FirstDataReceived) return;
-            if (!firstSetDone) { firstSetDone = true; string firstSymbol = Auto.Ins.DataManager.FirstSymbol; var firstInfo = Auto.Ins.GetStock(firstSymbol); if (firstInfo != null) SetStockList(new List<JubbyStockInfo> { firstInfo }); return; }
-            if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count) return;
-            string symbol = StockList[CurrentIndex].Symbol; var info = Auto.Ins.GetStock(symbol); if (info == null) return;
-            if (!isBackupMode) LoadChart(info);
+            // 1. [에러 수정] DataManager 대신 Auto.Ins의 종목 리스트를 직접 확인합니다.
+            // 현재 프로그램이 관리 중인 모든 종목 리스트를 가져옵니다.
+            var allStocks = Auto.Ins.GetStockList();
+
+            // 만약 아직 서버로부터 받은 종목 데이터가 하나도 없다면, 아무것도 하지 않고 돌아갑니다.
+            if (allStocks == null || allStocks.Count == 0) return;
+
+            // 2. 첫 데이터 수신 시, 차트의 주인공(첫 번째 종목)을 결정합니다.
+            if (!firstSetDone)
+            {
+                // 이 블록은 프로그램 실행 후 딱 한 번만 실행됩니다.
+                firstSetDone = true;
+
+                // 수신된 종목들 중 가장 첫 번째 종목을 선택합니다.
+                var firstInfo = allStocks.FirstOrDefault();
+
+                if (firstInfo != null)
+                {
+                    // 선택된 첫 번째 종목을 차트의 관리 리스트에 넣고 화면을 그립니다.
+                    SetStockList(new List<JubbyStockInfo> { firstInfo });
+                }
+                return;
+            }
+
+            // 3. 현재 화면에 띄워진 종목이 있는지 확인 (안전 점검)
+            if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count)
+                return;
+
+            // 4. 현재 차트가 보여주고 있는 종목의 최신 정보를 가져옵니다.
+            string symbol = StockList[CurrentIndex].Symbol;
+            var info = Auto.Ins.GetStock(symbol);
+
+            // 해당 종목 정보가 없으면 업데이트를 중단합니다.
+            if (info == null) return;
+
+            // 5. [라이브 모드] 백업 데이터를 보고 있는 상태가 아니라면, 1초마다 실시간으로 캔들을 다시 그립니다.
+            if (!isBackupMode)
+            {
+                // 'LoadChart' 함수 내부에서 최신 가격 정보를 바탕으로 차트를 갱신합니다.
+                LoadChart(info);
+            }
         }
 
         // [UpdateMarketData 함수 수정판]

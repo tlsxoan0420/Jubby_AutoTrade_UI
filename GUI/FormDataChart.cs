@@ -1,40 +1,151 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data; // 🔥 [추가] DB에서 온 표(DataTable)를 쓰기 위해 필수
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Jubby_AutoTrade_UI.COMMON;
-using static Jubby_AutoTrade_UI.COMMON.Flag;
+using Jubby_AutoTrade_UI.SEQUENCE; // 🔥 [추가] 지휘관 Auto.cs와 소통하기 위해
 
 namespace Jubby_AutoTrade_UI.GUI
 {
     public partial class FormDataChart : Form
     {
         private DataGridView[] dgvChartArray;
-        // Dictionary 맵 방식 대신 직접 검색 방식을 사용하여 안정성을 높입니다.
 
-        public FormDataChart() { InitializeComponent(); UIOrganize(); }
+        public FormDataChart()
+        {
+            InitializeComponent();
 
+            // 🔥 [에러 수정] 생성자 안에서는 UI 초기화(UIOrganize)나 이벤트 구독(SubscribeToEvents)을 하지 않습니다.
+            // 대신 화면이 켜질 때 발생하는 Load 이벤트에 이 기능들을 위임합니다.
+            this.Load += FormDataChart_Load;
+        }
+
+        /// <summary>
+        /// 폼 화면이 열릴 준비를 마치고 화면에 뜨기 직전에 실행되는 함수입니다. (Null 참조 방지)
+        /// </summary>
+        private void FormDataChart_Load(object sender, EventArgs e)
+        {
+            UIOrganize(); // 1. 표의 모양과 색상을 먼저 잡습니다.
+            SubscribeToEvents(); // 2. 지휘관(Auto.cs)의 신호탄을 기다립니다.
+        }
+
+        /// <summary>
+        /// 📡 [핵심] 지휘관(Auto.cs)이 DB에서 최신 표를 퍼왔을 때 나한테도 알려달라고 등록합니다.
+        /// </summary>
+        private void SubscribeToEvents()
+        {
+            // Auto.cs 지휘관이 "데이터 갱신했어!" 라고 외치면 아래 함수들이 즉시 실행됩니다.
+            Auto.Ins.OnMarketDataRefreshed += (dt) => UpdateGridDataSource(dgvChart1, dt);
+            Auto.Ins.OnAccountDataRefreshed += (dt) => UpdateGridDataSource(dgvChart2, dt);
+            Auto.Ins.OnOrderDataRefreshed += (dt) => UpdateGridDataSource(dgvChart3, dt);
+            Auto.Ins.OnStrategyDataRefreshed += (dt) => UpdateGridDataSource(dgvChart4, dt);
+        }
+
+        /// <summary>
+        /// 🚀 [초고속 갱신] DB에서 온 엑셀 표를 화면에 있는 표(그리드)에 0.1초 만에 꽂아 넣습니다.
+        /// </summary>
+        private void UpdateGridDataSource(DataGridView dgv, DataTable dt)
+        {
+            // 아직 화면이 생성되지 않았거나, 대상 그리드가 없으면 무시합니다 (에러 방지)
+            if (dgv == null || !dgv.IsHandleCreated || this.IsDisposed) return;
+
+            // UI 스레드 충돌을 방지하기 위한 안전장치 (다른 스레드가 화면을 건드리지 못하게 함)
+            if (dgv.InvokeRequired)
+            {
+                dgv.BeginInvoke(new Action(() => UpdateGridDataSource(dgv, dt)));
+                return;
+            }
+
+            try
+            {
+                // 선택 상태를 유지하기 위해 현재 몇 번째 줄을 클릭했는지 기억해둡니다.
+                int scrollIdx = dgv.FirstDisplayedScrollingRowIndex;
+                int selectedIdx = dgv.CurrentRow?.Index ?? -1;
+
+                dgv.DataSource = dt; // 🔥 마법의 한 줄: 표 데이터 전체 즉시 교체
+
+                // 기존에 보던 위치와 선택했던 줄을 복원합니다. (사용자 편의성)
+                if (scrollIdx >= 0 && scrollIdx < dgv.RowCount) dgv.FirstDisplayedScrollingRowIndex = scrollIdx;
+                if (selectedIdx >= 0 && selectedIdx < dgv.RowCount) dgv.Rows[selectedIdx].Selected = true;
+
+                // 숫자가 예쁘게 보이도록 천단위 콤마(,) 등 서식을 입힙니다.
+                ApplyCustomFormatting(dgv);
+            }
+            catch { /* 찰나의 데이터 꼬임은 무시합니다 */ }
+        }
+
+        /// <summary>
+        /// ✨ 표에 있는 글자들의 색상이나 숫자의 콤마(,)를 예쁘게 다듬습니다.
+        /// </summary>
+        private void ApplyCustomFormatting(DataGridView dgv)
+        {
+            foreach (DataGridViewRow row in dgv.Rows)
+            {
+                foreach (DataGridViewCell cell in row.Cells)
+                {
+                    if (cell.OwningColumn == null) continue;
+
+                    string colName = cell.OwningColumn.Name.ToLower();
+
+                    // 1. 수익률이나 등락률이 플러스면 '라임색', 마이너스면 '하늘색'으로 칠합니다.
+                    if (colName.Contains("rate") || colName.Contains("return") || colName.Contains("yield"))
+                    {
+                        double val = 0;
+                        if (double.TryParse(cell.Value?.ToString().Replace("%", ""), out val))
+                        {
+                            if (val > 0) cell.Style.ForeColor = Color.Lime;
+                            else if (val < 0) cell.Style.ForeColor = Color.DeepSkyBlue;
+                            else cell.Style.ForeColor = Color.WhiteSmoke;
+                        }
+                    }
+                    // 2. 전략 신호가 BUY면 라임, SELL이면 하늘색
+                    if (colName == "signal")
+                    {
+                        string sig = cell.Value?.ToString().ToUpper();
+                        if (sig == "BUY") cell.Style.ForeColor = Color.Lime;
+                        else if (sig == "SELL") cell.Style.ForeColor = Color.DeepSkyBlue;
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 🎨 UI 초기 셋팅 (표의 색상과 기본 디자인)
+        // =====================================================================
+
+        /// <summary>
+        /// 주삐 프로젝트의 차트 UI 구성 및 초기 설정을 관리하는 메서드입니다.
+        /// </summary>
         public void UIOrganize()
         {
+            // 1. DataGridView 컨트롤들을 배열로 묶어서 관리하기 편하게 초기화합니다.
+            // (배열 요소인 dgvChart1 등이 null인지 확인하여 안전하게 묶습니다)
+            if (dgvChart1 == null || dgvChart2 == null || dgvChart3 == null || dgvChart4 == null) return;
+
             dgvChartArray = new DataGridView[] { dgvChart1, dgvChart2, dgvChart3, dgvChart4 };
 
+            // 2. 배열에 담긴 차트 개수만큼 반복하며 설정을 적용합니다.
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
                 dgvChartArray[i].SelectionChanged -= DgvChart_SelectionChanged;
                 dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
-                SetGridStyle(dgvChartArray[i], i);
+
+                SetGridStyle(dgvChartArray[i]);
                 dgvChartArray[i].AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             }
         }
 
-        private void FormDataChart_Load(object sender, EventArgs e) { UIUpdate(); }
-        public void UIUpdate() { }
-
-        private void SetGridStyle(DataGridView dgv, int Chart)
+        private void SetGridStyle(DataGridView dgv)
         {
-            dgv.DoubleBuffered(true); dgv.AllowUserToAddRows = false; dgv.RowHeadersVisible = false;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgv.ReadOnly = true; dgv.BorderStyle = BorderStyle.None;
+            // 💡 [중요] DB 연동 모드에서는 C#이 컬럼을 자동으로 만들게 내버려둡니다.
+            dgv.AutoGenerateColumns = true;
+
+            dgv.DoubleBuffered(true); // 깜빡임 방지
+            dgv.AllowUserToAddRows = false; dgv.RowHeadersVisible = false;
+            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgv.ReadOnly = true;
+            dgv.BorderStyle = BorderStyle.None;
             dgv.BackgroundColor = Color.FromArgb(5, 5, 15); dgv.DefaultCellStyle.BackColor = Color.FromArgb(5, 5, 15);
             dgv.DefaultCellStyle.ForeColor = Color.WhiteSmoke; dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 40, 60);
             dgv.DefaultCellStyle.SelectionForeColor = Color.White; dgv.GridColor = Color.FromArgb(70, 70, 90);
@@ -43,238 +154,38 @@ namespace Jubby_AutoTrade_UI.GUI
             dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(20, 20, 35);
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.LightGray;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("HY헤드라인M", 10, FontStyle.Bold);
-            dgv.ColumnHeadersHeight = 100;
-
-            // 껍데기 강제 리셋 (밀림 방지)
-            dgv.Columns.Clear();
-
-            if (Chart == 0) // 시세
-            {
-                AddColumn(dgv, "No", "번호", 40); AddColumn(dgv, "Symbol", "종목코드", 60); AddColumn(dgv, "Name", "종목명", 60);
-                AddColumn(dgv, "Last_Price", "현재가", 60); AddColumn(dgv, "Open_Price", "시가", 60); AddColumn(dgv, "High_Price", "고가", 60);
-                AddColumn(dgv, "Low_Price", "저가", 60); AddColumn(dgv, "Return_1m", "1분 등락률", 80); AddColumn(dgv, "Trade_Amount", "거래대금", 80);
-                AddColumn(dgv, "Vol_Energy", "볼륨에너지", 70); AddColumn(dgv, "Disparity", "이격도", 70); AddColumn(dgv, "Volume", "거래량", 60);
-            }
-            else if (Chart == 1) // 잔고
-            {
-                AddColumn(dgv, "No", "번호", 40); AddColumn(dgv, "Symbol", "종목코드", 60); AddColumn(dgv, "Name", "종목명", 60);
-                AddColumn(dgv, "Quantity", "보유수량", 60); AddColumn(dgv, "Avg_Price", "평균매입가", 80); AddColumn(dgv, "Current_Price", "현재가", 80);
-                AddColumn(dgv, "Pnl_Amt", "평가손익금(원)", 100); AddColumn(dgv, "Pnl_Rate", "수익률(%)", 80); AddColumn(dgv, "Available_Cash", "주문가능금액", 100);
-            }
-            else if (Chart == 2) // 주문
-            {
-                AddColumn(dgv, "No", "번호", 40); AddColumn(dgv, "Symbol", "종목코드", 60); AddColumn(dgv, "Name", "종목명", 60);
-                AddColumn(dgv, "Order_Type", "주문종류", 60); AddColumn(dgv, "Order_Price", "주문가격", 60); AddColumn(dgv, "Order_Quantity", "주문수량", 60);
-                AddColumn(dgv, "Filled_Quqntity", "체결수량", 60); AddColumn(dgv, "Order_Time", "주문시간", 80); AddColumn(dgv, "Status", "주문상태", 60);
-                AddColumn(dgv, "Order_Yield", "수익률", 80);
-            }
-            else if (Chart == 3) // 전략
-            {
-                AddColumn(dgv, "No", "번호", 40); AddColumn(dgv, "Symbol", "종목코드", 60); AddColumn(dgv, "Name", "종목명", 60);
-                AddColumn(dgv, "Ma_5", "단기 이동평균", 80); AddColumn(dgv, "Ma_20", "장기 이동평균", 80); AddColumn(dgv, "RSI", "RSI 지표", 60);
-                AddColumn(dgv, "MACD", "MACD 지표", 60); AddColumn(dgv, "Signal", "전략 신호", 60);
-            }
+            dgv.ColumnHeadersHeight = 35;
         }
 
-        private void AddColumn(DataGridView dgv, string name, string header, int width)
-        {
-            int idx = dgv.Columns.Add(name, header);
-            dgv.Columns[idx].Width = width;
-            dgv.Columns[idx].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-        }
-
-        private void UpdateData(int targetIndex, Flag.JubbyStockInfo stock, Flag.UpdateTarget target)
-        {
-            if (targetIndex < 0 || targetIndex >= dgvChartArray.Length) return;
-            DataGridView targetGrid = dgvChartArray[targetIndex];
-
-            if (targetGrid.InvokeRequired) { this.Invoke(new Action(() => UpdateData(targetIndex, stock, target))); return; }
-
-            try
-            {
-                // 1. 주문 내역(index 2)은 데이터가 계속 쌓여야 하므로 로직 분리
-                if (targetIndex == 2)
-                {
-                    var orders = stock.GetOrderListSafe();
-                    if (orders == null) return;
-
-                    foreach (var order in orders)
-                    {
-                        bool isDuplicate = false;
-                        foreach (DataGridViewRow r in targetGrid.Rows)
-                        {
-                            if (r.Cells["Symbol"].Value?.ToString() == stock.Symbol &&
-                                r.Cells["Order_Time"].Value?.ToString() == order.Order_Time)
-                            { isDuplicate = true; break; }
-                        }
-
-                        if (!isDuplicate)
-                        {
-                            int rowIdx = targetGrid.Rows.Add();
-                            DataGridViewRow newRow = targetGrid.Rows[rowIdx];
-                            newRow.Cells["No"].Value = rowIdx + 1;
-                            newRow.Cells["Symbol"].Value = stock.Symbol;
-                            newRow.Cells["Name"].Value = stock.Name;
-                            newRow.Cells["Order_Type"].Value = order.Order_Type;
-                            newRow.Cells["Order_Price"].Value = order.Order_Price.ToString("N0");
-                            newRow.Cells["Order_Quantity"].Value = order.Order_Quantity.ToString("N0");
-                            newRow.Cells["Filled_Quqntity"].Value = order.Filled_Quqntity.ToString("N0");
-                            newRow.Cells["Order_Time"].Value = order.Order_Time;
-                            newRow.Cells["Status"].Value = order.Status;
-
-                            string yieldStr = string.IsNullOrEmpty(order.Order_Yield) ? "0.00%" : order.Order_Yield;
-                            newRow.Cells["Order_Yield"].Value = yieldStr;
-                            if (yieldStr.Contains("-")) newRow.Cells["Order_Yield"].Style.ForeColor = Color.DeepSkyBlue;
-                            else if (yieldStr == "0.00%") newRow.Cells["Order_Yield"].Style.ForeColor = Color.WhiteSmoke;
-                            else newRow.Cells["Order_Yield"].Style.ForeColor = Color.Lime;
-
-                            // 차트 마커 표시
-                            var chartForm = Application.OpenForms.OfType<FormGraphic>().FirstOrDefault();
-                            if (chartForm != null && order.Order_Price > 0)
-                            {
-                                string oType = order.Order_Type ?? "";
-                                if (oType == "BUY" || oType.Contains("SELL"))
-                                    chartForm.AddOrderMarker(stock.Symbol, oType, order.Order_Price, order.Order_Time);
-                            }
-                        }
-                    }
-                    if (targetGrid.Rows.Count > 500) targetGrid.Rows.RemoveAt(0);
-                    if (targetGrid.Rows.Count > 0) targetGrid.FirstDisplayedScrollingRowIndex = targetGrid.Rows.Count - 1;
-                    return;
-                }
-
-                // 2. 나머지 표(시세, 잔고, 전략)는 종목당 1줄씩만 유지
-                DataGridViewRow targetRow = null;
-                foreach (DataGridViewRow r in targetGrid.Rows)
-                {
-                    if (r.Cells["Symbol"].Value?.ToString() == stock.Symbol)
-                    {
-                        targetRow = r;
-                        break;
-                    }
-                }
-
-                if (targetRow == null)
-                {
-                    int rowIndex = targetGrid.Rows.Add();
-                    targetRow = targetGrid.Rows[rowIndex];
-                    targetRow.Cells["No"].Value = rowIndex + 1;
-                    targetRow.Cells["Symbol"].Value = stock.Symbol;
-                    targetRow.Cells["Name"].Value = stock.Name;
-                }
-
-                SetRowValues(targetRow, stock, target);
-                targetGrid.Refresh();
-            }
-            catch { }
-        }
-
-        // 🔥 어떤 에러가 발생해도 절대 튕기지 않고 안전하게 표에 값을 넣는 방탄 함수
-        private void SetCellSafe(DataGridViewRow row, string colName, object value, Color? color = null)
-        {
-            if (row.DataGridView.Columns.Contains(colName))
-            {
-                row.Cells[colName].Value = value;
-                if (color.HasValue) row.Cells[colName].Style.ForeColor = color.Value;
-            }
-        }
-
-        private void SetRowValues(DataGridViewRow row, Flag.JubbyStockInfo stock, Flag.UpdateTarget target)
-        {
-            try
-            {
-                if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Market)
-                {
-                    SetCellSafe(row, "Last_Price", stock.Market.Last_Price.ToString("N0"));
-                    SetCellSafe(row, "Open_Price", stock.Market.Open_Price.ToString("N0"));
-                    SetCellSafe(row, "High_Price", stock.Market.High_Price.ToString("N0"));
-                    SetCellSafe(row, "Low_Price", stock.Market.Low_Price.ToString("N0"));
-
-                    Color retColor = stock.Market.Return_1m > 0 ? Color.Lime : (stock.Market.Return_1m < 0 ? Color.DeepSkyBlue : Color.WhiteSmoke);
-                    SetCellSafe(row, "Return_1m", stock.Market.Return_1m.ToString("N2"), retColor);
-
-                    SetCellSafe(row, "Trade_Amount", stock.Market.Trade_Amount.ToString("N0"));
-
-                    Color volColor = stock.Market.Vol_Energy >= 2.5m ? Color.Orange : Color.WhiteSmoke;
-                    SetCellSafe(row, "Vol_Energy", stock.Market.Vol_Energy.ToString("N2"), volColor);
-
-                    SetCellSafe(row, "Disparity", stock.Market.Disparity.ToString("N2"));
-                    SetCellSafe(row, "Volume", stock.Market.Volume.ToString("N0"));
-                }
-
-                if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Account)
-                {
-                    SetCellSafe(row, "Quantity", stock.MyAccount.Quantity.ToString("N0"));
-                    SetCellSafe(row, "Avg_Price", stock.MyAccount.Avg_Price.ToString("N0"));
-                    SetCellSafe(row, "Current_Price", stock.MyAccount.Current_Price.ToString("N0"));
-
-                    Color pnlColor = stock.MyAccount.Pnl_Rate > 0 ? Color.Lime : (stock.MyAccount.Pnl_Rate < 0 ? Color.DeepSkyBlue : Color.WhiteSmoke);
-                    SetCellSafe(row, "Pnl_Amt", stock.MyAccount.Pnl_Amt.ToString("N0"), pnlColor);
-                    SetCellSafe(row, "Pnl_Rate", stock.MyAccount.Pnl_Rate.ToString("N2") + "%", pnlColor);
-
-                    SetCellSafe(row, "Available_Cash", stock.MyAccount.Available_Cash.ToString("N0"));
-                }
-
-                if (target == Flag.UpdateTarget.All || target == Flag.UpdateTarget.Strategy)
-                {
-                    if (stock.Strategy != null)
-                    {
-                        SetCellSafe(row, "Ma_5", stock.Strategy.Ma_5.ToString("N2"));
-                        SetCellSafe(row, "Ma_20", stock.Strategy.Ma_20.ToString("N2"));
-                        SetCellSafe(row, "RSI", stock.Strategy.RSI.ToString("N2"));
-                        SetCellSafe(row, "MACD", stock.Strategy.MACD.ToString("N2"));
-
-                        Color sigColor = stock.Strategy.Signal == "BUY" ? Color.Lime : (stock.Strategy.Signal == "SELL" ? Color.DeepSkyBlue : Color.WhiteSmoke);
-                        SetCellSafe(row, "Signal", stock.Strategy.Signal, sigColor);
-                    }
-                }
-            }
-            catch { } // 에러 무시
-        }
-
-        private void ReindexRows(DataGridView dgv) { for (int i = 0; i < dgv.Rows.Count; i++) dgv.Rows[i].Cells["No"].Value = i + 1; }
-
-        internal void ApplyStockUpdate(JubbyStockInfo stock, UpdateTarget target)
-        {
-            if (this.IsDisposed) return;
-            if (this.InvokeRequired) { this.BeginInvoke(new Action(() => ApplyStockUpdate(stock, target))); return; }
-
-            if (target == UpdateTarget.Market || target == UpdateTarget.All) UpdateData(0, stock, UpdateTarget.Market);
-            if (target == UpdateTarget.Account || target == UpdateTarget.All) UpdateData(1, stock, UpdateTarget.Account);
-            if (target == UpdateTarget.Order || target == UpdateTarget.All) UpdateData(2, stock, UpdateTarget.Order);
-            if (target == UpdateTarget.Strategy || target == UpdateTarget.All) UpdateData(3, stock, UpdateTarget.Strategy);
-        }
-
-        internal void SafeApplyStockUpdate(JubbyStockInfo stock, UpdateTarget target)
-        {
-            ApplyStockUpdate(stock, target);
-        }
-
+        // 🖱️ 표에서 종목을 클릭했을 때 좌측 차트 화면에 해당 종목을 띄워주는 기능
         private void DgvChart_SelectionChanged(object sender, EventArgs e)
         {
             try
             {
                 DataGridView dgv = sender as DataGridView;
-                if (dgv == null || dgv.CurrentRow == null || !dgv.Columns.Contains("Symbol")) return;
-                string symbol = Convert.ToString(dgv.CurrentRow.Cells["Symbol"].Value);
+                if (dgv == null || dgv.CurrentRow == null) return;
+
+                string symbol = "";
+                if (dgv.Columns.Contains("symbol")) symbol = dgv.CurrentRow.Cells["symbol"].Value?.ToString();
+                else if (dgv.Columns.Contains("Symbol")) symbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
+
                 if (string.IsNullOrWhiteSpace(symbol) || symbol == "-") return;
+
                 var chartForm = Application.OpenForms.OfType<FormGraphic>().FirstOrDefault();
                 chartForm?.ShowStock(symbol);
             }
             catch { }
         }
-
-        private void timer1_Tick(object sender, EventArgs e) { }
-        private void dgvChart1_DoubleClick(object sender, EventArgs e) { }
     }
 
+    // [확장 메서드] 표를 그릴 때 버벅이지 않게 해주는 비법 소스
     public static class ExtensionMethods
     {
         public static void DoubleBuffered(this DataGridView dgv, bool setting)
         {
             Type dgvType = dgv.GetType();
             System.Reflection.PropertyInfo pi = dgvType.GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            pi.SetValue(dgv, setting, null);
+            pi?.SetValue(dgv, setting, null); // pi가 null인지 안전하게 확인
         }
     }
 }

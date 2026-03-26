@@ -65,29 +65,65 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         }
 
         // DB에서 가져온 표(DataTable) 데이터를 차트용 객체로 변환해주는 헬퍼 함수
-        private void UpdateMemoryStocks(DataTable marketDt)
+
+        private void UpdateMemoryStocks(DataTable marketDt, DataTable strategyDt, DataTable orderDt)
         {
             if (marketDt == null) return;
 
+            // 1. 시장가(Market) 갱신
             foreach (DataRow row in marketDt.Rows)
             {
                 string symbol = row.Table.Columns.Contains("symbol") ? row["symbol"].ToString() : "";
                 if (string.IsNullOrEmpty(symbol)) continue;
 
-                // 새로운 종목이면 가입시키기
                 if (!_memoryStocks.ContainsKey(symbol))
                 {
                     string name = row.Table.Columns.Contains("symbol_name") ? row["symbol_name"].ToString() : symbol;
                     _memoryStocks[symbol] = new JubbyStockInfo(symbol, name);
                 }
 
-                // 차트 그리기 필수 데이터 (현재가, 시가, 고가, 저가, 거래량) 동기화
                 var m = _memoryStocks[symbol].Market;
                 m.Last_Price = SafeGetDecimal(row, "last_price");
                 m.Open_Price = SafeGetDecimal(row, "open_price");
                 m.High_Price = SafeGetDecimal(row, "high_price");
                 m.Low_Price = SafeGetDecimal(row, "low_price");
                 m.Volume = SafeGetDecimal(row, "volume");
+            }
+
+            // 2. 🔥 전략 시그널(Strategy) 갱신 (추가됨!)
+            if (strategyDt != null)
+            {
+                foreach (DataRow row in strategyDt.Rows)
+                {
+                    string symbol = row.Table.Columns.Contains("symbol") ? row["symbol"].ToString() : "";
+                    if (!string.IsNullOrEmpty(symbol) && _memoryStocks.ContainsKey(symbol))
+                    {
+                        var s = _memoryStocks[symbol].Strategy;
+                        s.Signal = row.Table.Columns.Contains("signal") ? row["signal"].ToString() : s.Signal;
+                    }
+                }
+            }
+
+            // 3. 🔥 주문 기록(Order) 갱신 - 차트 매매 타점 마커용 (추가됨!)
+            if (orderDt != null)
+            {
+                // 주문은 계속 쌓이므로 한 번 비우고 최신 내역으로 다시 채워줍니다.
+                foreach (var stock in _memoryStocks.Values) { stock.ClearOrders(); }
+
+                foreach (DataRow row in orderDt.Rows)
+                {
+                    string symbol = row.Table.Columns.Contains("symbol") ? row["symbol"].ToString() : "";
+                    if (!string.IsNullOrEmpty(symbol) && _memoryStocks.ContainsKey(symbol))
+                    {
+                        TradeOrderData o = new TradeOrderData
+                        {
+                            Order_Type = row.Table.Columns.Contains("order_type") ? row["order_type"].ToString() : "",
+                            Order_Price = SafeGetDecimal(row, "order_price"),
+                            Order_Time = row.Table.Columns.Contains("order_time") ? row["order_time"].ToString() : ""
+                        };
+                        _memoryStocks[symbol].AddOrder(o);
+                    }
+                }
             }
         }
 
@@ -181,8 +217,9 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                 DataTable statusDt = dbManager.GetSystemStatus();
                 DataTable settingDt = dbManager.GetSharedSettings();
 
-                // 📈 [핵심 연동] 차트 화면이 쓸 수 있도록 메모리에 데이터 최신화!
-                UpdateMemoryStocks(marketDt);
+                //UpdateMemoryStocks(marketDt);
+                // 📈 [핵심 연동] 차트 화면이 쓸 수 있도록 시장가, 전략, 주문 메모리에 최신화!
+                UpdateMemoryStocks(marketDt, strategyDt, orderDt);
 
                 // 2. 화면(Form) 쪽에 신호탄 발사! (UI 갱신)
                 OnMarketDataRefreshed?.Invoke(marketDt);

@@ -6,6 +6,7 @@ using ScottPlot.Plottables;
 using ScottPlot.WinForms;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -46,7 +47,35 @@ namespace Jubby_AutoTrade_UI.GUI
             FormsPlotMain.MouseDown += FormsPlotMain_MouseDown; CreateCustomContextMenu();
         }
 
-        private void FormGraphic_Load(object sender, EventArgs e) { UI_Update(); }
+        private void FormGraphic_Load(object sender, EventArgs e)
+        {
+            UI_Update();
+
+            // 🔥 [누락된 연결고리 추가] DB에서 새로운 데이터가 오면 차트 캔들 데이터(LiveOHLCData)를 축적하도록 신호탄 구독!
+            Auto.Ins.OnMarketDataRefreshed += Auto_OnMarketDataRefreshed;
+        }
+
+        // 🔥 [신규 추가] 지휘관이 신호탄을 쏘면 실행되는 캔들 축적 함수
+        private void Auto_OnMarketDataRefreshed(DataTable dt)
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => Auto_OnMarketDataRefreshed(dt)));
+                return;
+            }
+
+            try
+            {
+                // 메모리에 갱신된 모든 종목 데이터를 가져와서 차트용 데이터(OHLC)로 변환해 쌓아줍니다.
+                var stocks = Auto.Ins.GetStockList();
+                foreach (var stock in stocks)
+                {
+                    UpdateMarketData(stock);
+                }
+            }
+            catch { }
+        }
+
         private void UI_Update() { InitChart(); }
 
         private void CreateCustomContextMenu()

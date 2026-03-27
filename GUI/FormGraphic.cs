@@ -51,11 +51,11 @@ namespace Jubby_AutoTrade_UI.GUI
         {
             UI_Update();
 
-            // 🔥 [누락된 연결고리 추가] DB에서 새로운 데이터가 오면 차트 캔들 데이터(LiveOHLCData)를 축적하도록 신호탄 구독!
+            // 🔥 DB에서 새로운 데이터가 오면 차트 캔들 데이터(LiveOHLCData)를 축적하도록 신호탄 구독!
             Auto.Ins.OnMarketDataRefreshed += Auto_OnMarketDataRefreshed;
         }
 
-        // 🔥 [신규 추가] 지휘관이 신호탄을 쏘면 실행되는 캔들 축적 함수
+        // 지휘관이 신호탄을 쏘면 실행되는 캔들 축적 함수
         private void Auto_OnMarketDataRefreshed(DataTable dt)
         {
             if (this.InvokeRequired)
@@ -66,7 +66,6 @@ namespace Jubby_AutoTrade_UI.GUI
 
             try
             {
-                // 메모리에 갱신된 모든 종목 데이터를 가져와서 차트용 데이터(OHLC)로 변환해 쌓아줍니다.
                 var stocks = Auto.Ins.GetStockList();
                 foreach (var stock in stocks)
                 {
@@ -202,7 +201,7 @@ namespace Jubby_AutoTrade_UI.GUI
                 double avgLoss = sumLoss / 14.0; if (avgLoss == 0) stock.Strategy.RSI = 100m; else stock.Strategy.RSI = (decimal)(100.0 - (100.0 / (1.0 + (sumGain / 14.0) / avgLoss)));
             }
             if (ohlcList.Count > 26) { double ema12 = ohlcList.First().Close; double ema26 = ohlcList.First().Close; foreach (var c in ohlcList.Skip(1)) { ema12 = c.Close * (2.0 / 13.0) + ema12 * (1 - (2.0 / 13.0)); ema26 = c.Close * (2.0 / 27.0) + ema26 * (1 - (2.0 / 27.0)); } stock.Strategy.MACD = (decimal)(ema12 - ema26); }
-            stock.Strategy.Signal = "백업/복원";
+            stock.Strategy.Signal = "BACKUP";
         }
 
         private void ReDrawChartComplete()
@@ -210,18 +209,27 @@ namespace Jubby_AutoTrade_UI.GUI
             if (OHLCList.Count == 0) return;
             if (CandlePlot != null) FormsPlotMain.Plot.Remove(CandlePlot);
             CandlePlot = FormsPlotMain.Plot.Add.Candlestick(OHLCList.ToArray());
-            //if (VolumePlot != null) FormsPlotMain.Plot.Remove(VolumePlot);
-            //VolumePlot = FormsPlotMain.Plot.Add.Bars(OrderHistoryList.ToArray());
-            //foreach (var bar in VolumePlot.Bars) { bar.FillColor = ScottPlot.Colors.Blue.WithAlpha(0.3); bar.LineWidth = 0; }
         }
 
         internal void SetStockList(List<Flag.JubbyStockInfo> list) { StockList = list ?? new List<Flag.JubbyStockInfo>(); CurrentIndex = 0; if (StockList.Count > 0) LoadChart(StockList[CurrentIndex]); }
         public void ShowStock(string symbol) { if (StockList == null || StockList.Count == 0) return; int idx = StockList.FindIndex(s => s.Symbol == symbol); if (idx == -1) return; CurrentIndex = idx; LoadChart(StockList[CurrentIndex]); }
 
+        // 🔥 [핵심 수정] 100% 영문화 적용으로 한글(ㅁㅁㅁ) 깨짐 완벽 방지!
         private void InitChart()
         {
             var plt = FormsPlotMain.Plot; FormsPlotMain.Menu?.Clear();
-            plt.Axes.DateTimeTicksBottom(); plt.Title("JUBBY STOCK CHART (Waiting for data...)"); plt.YLabel("Price"); ChartInitialized = true;
+            plt.Axes.DateTimeTicksBottom();
+
+            // 모든 텍스트를 반드시 영어로 고정
+            plt.Title("JUBBY AI CHART - [Waiting for data...]");
+            plt.YLabel("Price (KRW)");
+            plt.XLabel("Time (HH:mm)");
+
+            // 우측 상단 범례(Legend) 표시 켜기
+            plt.Legend.IsVisible = true;
+            plt.Legend.Location = Alignment.UpperRight;
+
+            ChartInitialized = true;
         }
 
         internal void LoadChart(Flag.JubbyStockInfo info)
@@ -232,11 +240,15 @@ namespace Jubby_AutoTrade_UI.GUI
                 OHLCList.Clear(); OrderHistoryList.Clear();
                 if (isBackupMode && BackupOHLCData.ContainsKey(info.Symbol)) { OHLCList.AddRange(BackupOHLCData[info.Symbol]); OrderHistoryList.AddRange(BackupVolumeData[info.Symbol]); }
                 else if (!isBackupMode && LiveOHLCData.ContainsKey(info.Symbol)) { OHLCList.AddRange(LiveOHLCData[info.Symbol]); OrderHistoryList.AddRange(LiveVolumeData[info.Symbol]); }
-                ReDrawChartComplete(); UpdateOrderMarkers(info.GetOrderListSafe());
-                FormsPlotMain.Plot.Title($"JUBBY STOCK CHART - [{info.Symbol}]");
+
+                ReDrawChartComplete();
+                UpdateOrderMarkers(info.GetOrderListSafe());
+
+                // 영어 타이틀로 갱신
+                FormsPlotMain.Plot.Title($"JUBBY AI CHART - [{info.Symbol}]");
                 FormsPlotMain.Plot.Axes.AutoScale();
-                // 🔥 [핵심 추가] 만약 캔들이 딱 1개밖에 없다면?
-                // 화면에 꽉 차서 거대한 벽처럼 보이지 않도록 강제로 좌우 여백을 줍니다!
+
+                // 만약 캔들이 딱 1개밖에 없다면 화면에 꽉 차서 거대한 벽처럼 보이지 않도록 강제로 좌우 여백을 줍니다!
                 if (OHLCList.Count == 1)
                 {
                     double xCenter = OHLCList[0].DateTime.ToOADate();
@@ -256,19 +268,36 @@ namespace Jubby_AutoTrade_UI.GUI
             foreach (var o in orders)
             {
                 if (string.IsNullOrEmpty(o.Order_Time) || !DateTime.TryParse(o.Order_Time, out DateTime dt)) continue;
-                // 🔥 [핵심 추가] 파이썬이 보낸 글자가 비어있으면 차트가 기절하는 버그(NullReferenceException) 완벽 차단!
                 if (string.IsNullOrEmpty(o.Order_Type)) continue;
 
                 double x = dt.ToOADate(); double y = (double)o.Order_Price;
                 if (o.Order_Type.Contains("BUY") || o.Order_Type.Contains("매수")) { buyX.Add(x); buyY.Add(y); }
-                else if (o.Order_Type.Contains("SELL") || o.Order_Type.Contains("매도")) { sellX.Add(x); sellY.Add(y); }
+                else if (o.Order_Type.Contains("SELL") || o.Order_Type.Contains("매도") || o.Order_Type.Contains("절")) { sellX.Add(x); sellY.Add(y); }
             }
 
             if (BuyMarkers != null) FormsPlotMain.Plot.Remove(BuyMarkers);
-            if (buyX.Count > 0) { BuyMarkers = FormsPlotMain.Plot.Add.Scatter(buyX.ToArray(), buyY.ToArray()); BuyMarkers.Color = ScottPlot.Colors.Lime; BuyMarkers.MarkerShape = MarkerShape.FilledTriangleDown; BuyMarkers.MarkerSize = 8; BuyMarkers.LineWidth = 0; } else { BuyMarkers = null; }
+            if (buyX.Count > 0)
+            {
+                BuyMarkers = FormsPlotMain.Plot.Add.Scatter(buyX.ToArray(), buyY.ToArray());
+                BuyMarkers.Color = ScottPlot.Colors.Lime; // 매수 타점 라임색 삼각형
+                BuyMarkers.MarkerShape = MarkerShape.FilledTriangleDown;
+                BuyMarkers.MarkerSize = 10;
+                BuyMarkers.LineWidth = 0;
+                BuyMarkers.Label = "BUY"; // 범례 이름 영어로
+            }
+            else { BuyMarkers = null; }
 
             if (SellMarkers != null) FormsPlotMain.Plot.Remove(SellMarkers);
-            if (sellX.Count > 0) { SellMarkers = FormsPlotMain.Plot.Add.Scatter(sellX.ToArray(), sellY.ToArray()); SellMarkers.Color = ScottPlot.Colors.Red; SellMarkers.MarkerShape = MarkerShape.FilledTriangleUp; SellMarkers.MarkerSize = 8; SellMarkers.LineWidth = 0; } else { SellMarkers = null; }
+            if (sellX.Count > 0)
+            {
+                SellMarkers = FormsPlotMain.Plot.Add.Scatter(sellX.ToArray(), sellY.ToArray());
+                SellMarkers.Color = ScottPlot.Colors.Red; // 매도 타점 빨간색 삼각형
+                SellMarkers.MarkerShape = MarkerShape.FilledTriangleUp;
+                SellMarkers.MarkerSize = 10;
+                SellMarkers.LineWidth = 0;
+                SellMarkers.Label = "SELL"; // 범례 이름 영어로
+            }
+            else { SellMarkers = null; }
         }
 
         private void FormStockChart_KeyDown(object sender, KeyEventArgs e) { if (e.Control && e.KeyCode == Keys.Left) MovePrevStock(); else if (e.Control && e.KeyCode == Keys.Right) MoveNextStock(); }
@@ -280,50 +309,33 @@ namespace Jubby_AutoTrade_UI.GUI
         /// </summary>
         private void timer1_Tick(object sender, EventArgs e)
         {
-            // 1. [에러 수정] DataManager 대신 Auto.Ins의 종목 리스트를 직접 확인합니다.
-            // 현재 프로그램이 관리 중인 모든 종목 리스트를 가져옵니다.
             var allStocks = Auto.Ins.GetStockList();
-
-            // 만약 아직 서버로부터 받은 종목 데이터가 하나도 없다면, 아무것도 하지 않고 돌아갑니다.
             if (allStocks == null || allStocks.Count == 0) return;
 
-            // 2. 첫 데이터 수신 시, 차트의 주인공(첫 번째 종목)을 결정합니다.
             if (!firstSetDone)
             {
-                // 이 블록은 프로그램 실행 후 딱 한 번만 실행됩니다.
                 firstSetDone = true;
-
-                // 수신된 종목들 중 가장 첫 번째 종목을 선택합니다.
                 var firstInfo = allStocks.FirstOrDefault();
-
                 if (firstInfo != null)
                 {
-                    // 선택된 첫 번째 종목을 차트의 관리 리스트에 넣고 화면을 그립니다.
                     SetStockList(new List<JubbyStockInfo> { firstInfo });
                 }
                 return;
             }
 
-            // 3. 현재 화면에 띄워진 종목이 있는지 확인 (안전 점검)
             if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count)
                 return;
 
-            // 4. 현재 차트가 보여주고 있는 종목의 최신 정보를 가져옵니다.
             string symbol = StockList[CurrentIndex].Symbol;
             var info = Auto.Ins.GetStock(symbol);
-
-            // 해당 종목 정보가 없으면 업데이트를 중단합니다.
             if (info == null) return;
 
-            // 5. [라이브 모드] 백업 데이터를 보고 있는 상태가 아니라면, 1초마다 실시간으로 캔들을 다시 그립니다.
             if (!isBackupMode)
             {
-                // 'LoadChart' 함수 내부에서 최신 가격 정보를 바탕으로 차트를 갱신합니다.
                 LoadChart(info);
             }
         }
 
-        // [UpdateMarketData 함수 수정판]
         internal void UpdateMarketData(Flag.JubbyStockInfo info)
         {
             if (info == null || info.Market == null) return;
@@ -337,7 +349,6 @@ namespace Jubby_AutoTrade_UI.GUI
             }
 
             var m = info.Market;
-            // 시가가 0이어도 종가가 있으면 일단 그립니다 (조건 완화)
             if (m.Last_Price > 0)
             {
                 DateTime now = DateTime.Now;
@@ -345,7 +356,6 @@ namespace Jubby_AutoTrade_UI.GUI
                 var ohlcList = LiveOHLCData[sym];
                 var volList = LiveVolumeData[sym];
 
-                // 시가가 0인 경우 현재가로 대체하여 그래프 깨짐 방지
                 double open = m.Open_Price <= 0 ? (double)m.Last_Price : (double)m.Open_Price;
                 double high = m.High_Price <= 0 ? (double)m.Last_Price : (double)m.High_Price;
                 double low = m.Low_Price <= 0 ? (double)m.Last_Price : (double)m.Low_Price;
@@ -355,7 +365,7 @@ namespace Jubby_AutoTrade_UI.GUI
                     var last = ohlcList.Last();
                     last.High = Math.Max(last.High, (double)m.High_Price);
                     last.Low = Math.Min(last.Low, (double)m.Low_Price);
-                    if (last.Low <= 0) last.Low = (double)m.Last_Price; // 0원 방지
+                    if (last.Low <= 0) last.Low = (double)m.Last_Price;
                     last.Close = (double)m.Last_Price;
                     volList[volList.Count - 1] = (double)m.Volume;
                 }
@@ -368,14 +378,12 @@ namespace Jubby_AutoTrade_UI.GUI
                 }
             }
 
-            // 현재 보고 있는 종목이면 즉시 갱신
             if (StockList.Count > 0 && CurrentIndex < StockList.Count)
             {
                 if (StockList[CurrentIndex].Symbol == sym) LoadChart(info);
             }
         }
 
-        // [신규 함수: 종목 자동 등록용]
         internal void AddStockToList(Flag.JubbyStockInfo info)
         {
             if (!StockList.Any(x => x.Symbol == info.Symbol))

@@ -54,29 +54,34 @@ namespace Jubby_AutoTrade_UI.DATABASE
         // 📊 C# UI의 각 표(DataGridView)에 밀어넣을 데이터 가져오기
         // ====================================================================
 
+        // 💡 [마법의 번역기 AS 설명]
+        // 파이썬은 소문자(last_price)로 DB에 저장했지만, C# 화면의 표 뼈대 이름은 대문자(Last_Price)입니다.
+        // 'SELECT 파이썬이름 AS C#이름' 문법을 쓰면 C# 화면 표의 DataPropertyName과 이름이 완벽히 일치하게 되어
+        // 데이터가 표의 각 칸과 차트에 쏙쏙 예쁘게 들어갑니다!
+
         // 1. 실시간 시장 감시 데이터 (Market Table 용)
         public DataTable GetMarketStatus()
         {
-            return GetDataTable("SELECT * FROM MarketStatus");
+            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, last_price AS Last_Price, open_price AS Open_Price, high_price AS High_Price, low_price AS Low_Price, return_1m AS Return_1m, trade_amount AS Trade_Amount, vol_energy AS Vol_Energy, disparity AS Disparity, volume AS Volume FROM MarketStatus");
         }
 
         // 2. 실시간 계좌 잔고 데이터 (Account Table 용)
         public DataTable GetAccountStatus()
         {
-            return GetDataTable("SELECT * FROM AccountStatus");
+            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, quantity AS Quantity, avg_price AS Avg_Price, current_price AS Current_Price, pnl_amt AS Pnl, pnl_rate AS Pnl_Rate, available_cash AS Available_Cash FROM AccountStatus");
         }
 
         // 3. 전략 분석 신호 데이터 (Strategy Table 용)
         public DataTable GetStrategyStatus()
         {
-            return GetDataTable("SELECT * FROM StrategyStatus");
+            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, ma_5 AS Ma_5, ma_20 AS Ma_20, RSI AS RSI, macd AS MACD, signal AS Signal FROM StrategyStatus");
         }
 
         // 4. 매매 체결 영수증 데이터 (Order Table 용) - 최신 500개만
         public DataTable GetTradeHistory()
         {
             // 최신 거래가 맨 위로 오도록 내림차순(DESC) 정렬
-            return GetDataTable("SELECT * FROM TradeHistory ORDER BY id DESC LIMIT 500");
+            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, order_type AS Order_Type, order_price AS Order_Price, order_quantity AS Order_Quantity, filled_quantity AS Filled_Quqntity, order_time AS Order_Time, Status AS Status, order_yield AS Order_Yield FROM TradeHistory ORDER BY id DESC LIMIT 500");
         }
 
         // ====================================================================
@@ -86,6 +91,7 @@ namespace Jubby_AutoTrade_UI.DATABASE
         // 5. 현재 설정값 (상단 UI의 '현재 모드: 국내/미국' 표기용)
         public DataTable GetSharedSettings()
         {
+            // 설정이나 상태창은 특정 이름에 맞춰넣을 필요 없이 그대로 가져와서 파싱하므로 SELECT * 를 씁니다.
             return GetDataTable("SELECT * FROM SharedSettings");
         }
 

@@ -122,6 +122,8 @@ namespace Jubby_AutoTrade_UI.GUI
                         return;
                     }
 
+
+                    Share.Ins.ChangeMode(Flag.ModeNumber.Database);
                     break;
 
                 case 9: // 10. 종료 버튼

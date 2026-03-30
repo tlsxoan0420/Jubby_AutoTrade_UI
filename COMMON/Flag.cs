@@ -354,7 +354,7 @@ namespace Jubby_AutoTrade_UI.COMMON
         #endregion
 
         // C# 화면(Form)들의 모드 번호와, 유저 등급에 대한 상수(고정값)를 정리해둔 곳입니다.
-        public class ModeNumber { public const int Logout = 0; public const int Hide = 5; public const int Home = 10; public const int Simul = 20; public const int Auto = 30; public const int Error = 40; }
+        public class ModeNumber { public const int Logout = 0; public const int Hide = 5; public const int Home = 10; public const int Database = 15; public const int Simul = 20; public const int Auto = 30; public const int Error = 40; }
         public class UserLevel { public const int GUEST = 0; public const int ADMIN = 1; public const int MASTER = 2; }
     }
 }

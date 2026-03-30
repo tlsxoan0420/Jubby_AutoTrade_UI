@@ -19,6 +19,7 @@ namespace Jubby_AutoTrade_UI.GUI
         #region ## FormMain Define ##
         private FormMenu formMenu = new FormMenu();
         private FormStatus formStatus = new FormStatus();
+        private FormDataBase formDataBase = new FormDataBase();
 
         private Panel[] PalMainArray;
 
@@ -58,6 +59,7 @@ namespace Jubby_AutoTrade_UI.GUI
             EnableDrag(Auto.Ins.formGraphic);
             EnableDrag(Auto.Ins.formDataChart);
             EnableDrag(formStatus);
+            EnableDrag(formDataBase);
         }
         #endregion ## UI Organize ##
 
@@ -295,6 +297,7 @@ namespace Jubby_AutoTrade_UI.GUI
             Auto.Ins.formGraphic.Hide();
             Auto.Ins.formDataChart.Hide();
             formStatus.Hide();
+            formDataBase.Hide();
             Flag.Live.OldFormMode = frame;
 
             switch (frame)
@@ -317,6 +320,11 @@ namespace Jubby_AutoTrade_UI.GUI
                 case Flag.ModeNumber.Home:
                     Auto.Ins.formGraphic.Show();
                     Auto.Ins.formDataChart.Show();
+                    formStatus.Show();
+                    break;
+
+                case Flag.ModeNumber.Database:
+                    formDataBase.Show();
                     formStatus.Show();
                     break;
 

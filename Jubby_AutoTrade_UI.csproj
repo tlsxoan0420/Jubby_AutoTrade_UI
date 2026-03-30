@@ -101,6 +101,12 @@
     <Compile Include="COMMON\Share.cs" />
     <Compile Include="COM\TcpJsonServer.cs" />
     <Compile Include="DATABASE\DB_Manager.cs" />
+    <Compile Include="GUI\FormDataBase.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="GUI\FormDataBase.Designer.cs">
+      <DependentUpon>FormDataBase.cs</DependentUpon>
+    </Compile>
     <Compile Include="GUI\FormDataChart.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -153,6 +159,9 @@
     </Compile>
     <Compile Include="SEQUENCE\Auto.cs" />
     <Compile Include="SEQUENCE\Simulation.cs" />
+    <EmbeddedResource Include="GUI\FormDataBase.resx">
+      <DependentUpon>FormDataBase.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="GUI\FormDataChart.resx">
       <DependentUpon>FormDataChart.cs</DependentUpon>
     </EmbeddedResource>

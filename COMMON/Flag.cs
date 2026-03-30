@@ -162,12 +162,12 @@ namespace Jubby_AutoTrade_UI.COMMON
                     // 🚨 [강력 진단용 알림벨] 파이썬 통신 연결 직후 딱 1번만 환영 팝업을 띄웁니다.
                     if (FirstSymbol == null && msg.MsgType.ToLower() == "market")
                     {
-                        System.Windows.Forms.MessageBox.Show(
-                            $"[C# 통신 연결 대성공!]\n\n파이썬에서 보낸 데이터가 C# 문을 열고 들어왔습니다!\n\n" +
-                            $"메시지 종류: {msg.MsgType}\n" +
-                            $"데이터 내용 일부: {msg.Payload?.ToString().Substring(0, Math.Min(100, msg.Payload.ToString().Length))}...",
-                            "C# 수신 테스트"
-                        );
+                        //System.Windows.Forms.MessageBox.Show(
+                        //    $"[C# 통신 연결 대성공!]\n\n파이썬에서 보낸 데이터가 C# 문을 열고 들어왔습니다!\n\n" +
+                        //    $"메시지 종류: {msg.MsgType}\n" +
+                        //    $"데이터 내용 일부: {msg.Payload?.ToString().Substring(0, Math.Min(100, msg.Payload.ToString().Length))}...",
+                        //    "C# 수신 테스트"
+                        //);
                     }
 
                     // 메시지 타입(market, order 등)이 약속된 UpdateTarget이 아니면 거릅니다.
@@ -219,7 +219,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                 catch (Exception ex)
                 {
                     // 에러가 나면 콘솔이 아니라 팝업으로 띄워서 즉시 확인 가능하게 만듭니다.
-                    System.Windows.Forms.MessageBox.Show($"[C# 수신 에러]\n{ex.Message}", "에러 확인");
+                    Share.Ins.ErrorMessage($"[C# 수신 에러]\n{ex.Message}");
                 }
             }
 

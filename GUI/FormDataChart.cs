@@ -98,9 +98,10 @@ namespace Jubby_AutoTrade_UI.GUI
                     // 3. 숫자가 들어간 칸은 천단위 콤마(,)와 함께 소수점 싹 제거 (한국 주식 맞춤 정수)
                     else if (colName.Contains("Price") || colName.Contains("Quantity") || colName.Contains("Amount") || colName.Contains("Pnl") || colName.Contains("Cash") || colName == "Ma_5" || colName == "Ma_20" || colName == "Volume")
                     {
-                        if (double.TryParse(valStr.Replace(",", ""), out double numVal))
+                        string rawValue = valStr.Replace(",", ""); // 이미 콤마가 있다면 제거
+                        if (double.TryParse(rawValue, out double numVal))
                         {
-                            cell.Value = numVal.ToString("N0"); // 소수점 버리고 정수로 변환
+                            cell.Value = numVal.ToString("N0"); // 여기서 다시 천단위 콤마를 예쁘게 찍어줌
                         }
                     }
                 }
@@ -137,6 +138,7 @@ namespace Jubby_AutoTrade_UI.GUI
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.LightGray;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("HY헤드라인M", 11, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 35;
+            dgv.DataError += (s, e) => { e.ThrowException = false; }; // 에러 무시하고 계속 진행
 
             // 컬럼 매핑: DataPropertyName 을 DB_Manager.cs 의 Alias 와 똑같이 맞춰줍니다.
             if (dgv.Columns.Count == 0 && ChartIndex == 0) // 마켓

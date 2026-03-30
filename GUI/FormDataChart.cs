@@ -16,7 +16,6 @@ namespace Jubby_AutoTrade_UI.GUI
         public FormDataChart()
         {
             InitializeComponent();
-            this.Load += FormDataChart_Load;
         }
 
         private void FormDataChart_Load(object sender, EventArgs e)

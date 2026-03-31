@@ -29,11 +29,13 @@
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FormMain));
             this.palMain1 = new System.Windows.Forms.Panel();
             this.palMain4 = new System.Windows.Forms.Panel();
             this.palMain2 = new System.Windows.Forms.Panel();
             this.palMain3 = new System.Windows.Forms.Panel();
             this.timer1 = new System.Windows.Forms.Timer(this.components);
+            this.notifyIconMain = new System.Windows.Forms.NotifyIcon(this.components);
             this.SuspendLayout();
             // 
             // palMain1
@@ -72,17 +74,23 @@
             // 
             this.timer1.Tick += new System.EventHandler(this.timer1_Tick);
             // 
+            // notifyIconMain
+            // 
+            this.notifyIconMain.Icon = ((System.Drawing.Icon)(resources.GetObject("notifyIconMain.Icon")));
+            this.notifyIconMain.Text = "주삐(Jubby) AI 자동매매";
+            // 
             // FormMain
             // 
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.None;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(5)))), ((int)(((byte)(5)))), ((int)(((byte)(15)))));
-            this.ClientSize = new System.Drawing.Size(2560, 1440);
+            this.ClientSize = new System.Drawing.Size(2560, 1172);
             this.Controls.Add(this.palMain2);
             this.Controls.Add(this.palMain3);
             this.Controls.Add(this.palMain4);
             this.Controls.Add(this.palMain1);
             this.DoubleBuffered = true;
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+            this.KeyPreview = true;
             this.Name = "FormMain";
             this.StartPosition = System.Windows.Forms.FormStartPosition.WindowsDefaultBounds;
             this.Text = "FormMain";
@@ -98,5 +106,6 @@
         private System.Windows.Forms.Panel palMain2;
         private System.Windows.Forms.Panel palMain3;
         private System.Windows.Forms.Timer timer1;
+        private System.Windows.Forms.NotifyIcon notifyIconMain;
     }
 }

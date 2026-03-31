@@ -132,6 +132,55 @@
   <metadata name="timer1.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
     <value>17, 17</value>
   </metadata>
+  <metadata name="notifyIconMain.TrayLocation" type="System.Drawing.Point, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+    <value>128, 17</value>
+  </metadata>
+  <assembly alias="System.Drawing" name="System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" />
+  <data name="notifyIconMain.Icon" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+    <value>
+        AAABAAEAIBIAAAEAIABwCQAAFgAAACgAAAAgAAAAJAAAAAEAIAAAAAAAAAkAAMMOAADDDgAAAAAAAAAA
+        AAA+Hx//QB8e/0IgG/9CIBz/QCAe/z4fIf88HyP/PiAh/z4gI/89Iib/LBsf/wIKDv8+SFn/XYGT/3eq
+        tv93rr7/grzN/4XD1/+Z1+n/jdXs/6bZ6f/y////tMrS/wAeNv8DJDz/BCdD/wInRf8bNlP/M0Vn/ztK
+        cf85THj/LEhz/0AgIP8/ICH/Px8i/z8gJP8+ICX/PSAo/z0gK/89Ii3/PyMs/0ImK/8zHR//KCcv/09b
+        bv9unq3/bZyp/3epuf+Lydv/i8vf/6Lh8v+N1+//w+nx//7///+svMf/ABoy/wUnQP8CJ0P/EjBN/y5A
+        XP89Sm3/O0tz/z1Oef8vSXT/PiAq/z0gKv88IC3/PSEw/z0hMv8+IjH/PyMz/0MmLf9FJif/Qycu/0Mx
+        Pf9uYXL/Yl9z/3yquP9hjpz/U36P/5zd7v+W1ef/n+X4/5HO6P/Y5uz/8vv//zxSa/8AGzP/AyZA/xEv
+        Sv9KTWf/UlNv/0xScP9IU2//TVd4/y9Kb/9BIi//QSIw/0EiMf9BIzL/RCUz/0spL/9RKir/UCgn/1A2
+        Ov9gUmH/bWBx/4Byhv9+bYX/iKq6/zRWZP9DX3H/mL3O/5W6zf+N0+n/nsvh/+zv9v+gr7j/ABIs/wUm
+        Pf8BJD7/CCpH/wYqR/8UNVb/NUuA/0ZXlP9CVo7/CjVc/1EqJ/9PKSv/Tikv/1IrL/9dMCz/YTAo/147
+        N/9bRET/WU5a/3Zldv+DcoX/jHyS/5KBmv92jJ3/AhId/4ypv//P8P//1PH+/7Pm8/+63+3//////zdP
+        Yf8AFy//BSU9/wIkPv8AIz7/EzRS/y1FaP8gQGr/QlaI/xI7Zf8ZQGb/WS0s/1kuL/9cLzH/ZTMv/2gz
+        Lf9oPjn/YFde/1xUX/9xYW//fmp9/4VziP+OeZL/s6m//1NUZP8eMUL/ssjl/7LK3P+00t7/WHiH/0hi
+        cP9LYG7/ABsy/wQiOf8AITn/CStG/zlLff9HVJD/PlKL/y1Jfv8LNlr/G0Fx/0Vblv9nNCz/ZjUv/2k4
+        Mv9tPTX/azoy/3ReW/+PkpX/c2Rv/4d3hf+LfY3/npGj/7q2xP/JzNn/V1dr/yo5Uf9fXoj/cHOX/ys9
+        Tf8ABhj/AQ8i/wEUKf8EIjn/ASA2/wcnRf8xR3r/Lkl9/xtBdv8OOmn/FDtr/zBNjv8+XLD/MVao/2Q9
+        Rv9pQUb/aUNJ/2NDU/9cP1j/XUhi/5iam/+srrD/trq9/7Kxuf/U3eH/4e7x/7u0yf9OSl3/FiI1/7DB
+        4f+xx+n/JDNO/wATJP8IIjT/CSY+/wUiOv8BHzX/CStM/xxJhv8jVav/M2HG/zdgvP8jTpT/GEWA/xtK
+        kP8zZ9T/g1dL/35XVf93Vl7/e1pf/3pbY/9wVGb/jYmR/7zCwv+8wMT/yM3S/9/o7P/V3OT/rJ+4/0lP
+        Yv+btsT/x+H9/8rm/P+evcb/DCM0/wAXKv8LKkb/AyA3/wEhOf8vXJr/T4Tq/1aH7/9NhvP/Q4n3/zh+
+        3/8+jPz/LHXc/y9+5/9rU3X/aVeG/3Vfff+Lamj/kGxj/4dmZ/+Cb3f/uLy9/83S1f/X3OH/4+zw/9nh
+        6f/Izdj/sMTT/9/7//+wxuf/ssvp/+L///+hv9H/Ij9X/wgoRv8AGi3/K098/3mY4/9vkdz/b5Pd/3GY
+        5f9VhM3/W5Df/16e+v9am/7/UJb3/5p0Z/+edmL/nHVg/5FvaP+Ea3L/f2t6/3Fkg/+OjqP/ycvP/9rf
+        5P/k7fP/4urw/87a4P+0yOP/1fD7/9z4/f/Z+fz/0fD5/9Xz/P9HaIH/ACA8/wwsSP9fgMb/ZYTL/1d6
+        xP9Vfcv/UHvG/1mFzf9vnOr/dZ/r/3mm8v95qPP/pnpc/5p2ZP+Pcm3/hW5z/3xsff90bYv/b2yS/2xp
+        j/+xsLn/3+Pn/+Xt9P/t9fj/vcLU/4CKqv9okK//2Pb8/8rr9P9giK7/l7K9/yFCWf8AHjr/K1GC/1B9
+        xv9Kgcj/VozS/1mFzv9ahM//XZHe/2CV4/9fm+j/ZqT0/2ym9P+Ndnz/f2+D/3Vsi/9rcZ//bHWi/2N/
+        v/9ggMT/Xm+v/3+Gq//d4+f/9f7//9jg4v9qc4X/bneZ/1Nnif+rwN7/2fn7/2mGoP+Jqbf/JkZe/xM2
+        Xv9gkM7/cLD2/1y6/v9ZwP//Wbv9/1yt9/9cr/z/W7T+/1u9//9av///W7H4/2Ftwv9ddc3/YXK//2Fy
+        vv9aetH/VoLh/11/1v9fgtf/VYLT/6G83f/y9fX/tbbG/1dfgv+Ij7//f4i1/4+Xz/+0y+f/2P3//4mr
+        uv8NJkL/ZJLF/43V//+Bzv3/c8/+/2fQ/f9o1/7/a9b//2nO/v9wz/7/iNf9/4PX/v981Pn/dH+2/3B/
+        uf9nd7z/ZXzB/2CD0/9ihtX/XYDW/16I4P9po+z/ebfr/6/J3P+9yt7/sLjb/4eNwP9RX4j/KjpY/zhL
+        bf9Pa4P/ByA1/xo5Wv+Bz+v/h+X//4Td/P+F3v3/guD+/4Le/f+E3f3/fN39/3rf/f+D5v7/jO7//4jr
+        +P9serX/YHbC/2uS0/92rN7/ba7i/2ir4/9coef/dL3v/37K8v98y/b/dMf2/4DQ+f+q1+7/rLfV/5Km
+        vv83UF7/Axss/wYiQ/8bOWv/UZfJ/3Lh//9p1Pz/ZNT+/2bX/v9j1P7/Ydb+/2Tf/v9n5/7/de/+/4H0
+        /v+E+f//h/b4/16T0/9vsOD/gsnp/3zG6v9vvur/a73q/3bM8P+C2/f/hN/7/4Ti/P+E5P3/hOr+/4Hr
+        +/+Fxtr/qsXa/6C31f9ifJ3/Yoyv/1Skxv9z5Pb/ePD//3jv/f+E9f7/kfv+/4T3/v99+P7/h/7+/5b/
+        /v+f//7/pv/+/6b///+k+Pn/a77m/2/C6f9rv+n/Z7zq/27F7f992fT/iej7/4vt/f+L7/7/hOr+/4Pt
+        /v+D8P3/eun+/3z2//996vH/htnn/5vu+P+Z/v//mP///5r//v+X//7/mv/+/6H//v+h/v7/of7+/6P+
+        /v+k/f7/p/z+/6j8//+o/f//qv7//6b4+v8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+        AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+</value>
+  </data>
   <metadata name="$this.Locked" type="System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
     <value>True</value>
   </metadata>

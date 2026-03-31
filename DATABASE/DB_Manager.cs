@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SQLite; // 방금 설치한 NuGet 패키지
 using System.IO;
@@ -13,10 +14,10 @@ namespace Jubby_AutoTrade_UI.DATABASE
 
         public DB_Manager()
         {
-            // 💡 [핵심 마법의 주문]
-            // Read Only=True: C#은 무조건 "읽기만" 합니다. 쓰기는 파이썬 몫!
-            // Journal Mode=Wal: 파이썬이 데이터를 쓰는 찰나에 C#이 읽어도 DB가 잠기지(Locked) 않게 해줍니다.
-            connectionString = $"Data Source={dbPath};Version=3;Read Only=True;Journal Mode=Wal;";
+            // 💡 [핵심 마법의 주문 수정됨!]
+            // C#에서도 DB 데이터를 직접 수정(Edit)하고 저장할 수 있도록 'Read Only=True' 옵션을 삭제했습니다!
+            // Journal Mode=Wal 옵션은 유지하여 파이썬과 충돌(Locked)을 방지합니다.
+            connectionString = $"Data Source={dbPath};Version=3;Journal Mode=Wal;";
         }
 
         /// <summary>
@@ -51,7 +52,68 @@ namespace Jubby_AutoTrade_UI.DATABASE
         }
 
         // ====================================================================
-        // 📊 C# UI의 각 표(DataGridView)에 밀어넣을 데이터 가져오기
+        // 🔥 [새로 추가] DB 전체 열람 및 수정을 위한 기능들 (FormDataBase 화면 용)
+        // ====================================================================
+
+        // 1. DB 안에 있는 모든 테이블 이름 가져오기
+        public List<string> GetAllTableNames()
+        {
+            List<string> tables = new List<string>();
+            try
+            {
+                if (!File.Exists(dbPath)) return tables;
+                using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+                {
+                    conn.Open();
+                    // sqlite_master에서 시스템 테이블을 제외하고 진짜 테이블 이름만 쏙쏙 뽑아옵니다.
+                    string query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+                    using (SQLiteCommand cmd = new SQLiteCommand(query, conn))
+                    using (SQLiteDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            tables.Add(reader["name"].ToString());
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { Console.WriteLine($"Table List Error: {ex.Message}"); }
+            return tables;
+        }
+
+        // 2. 선택한 테이블의 모든 데이터 원본 가져오기 (수정용)
+        public DataTable GetRawTableData(string tableName)
+        {
+            // C# 화면명(AS) 변환 없이 날것 그대로 가져옵니다.
+            return GetDataTable($"SELECT * FROM {tableName}");
+        }
+
+        // 3. 수정한 엑셀표(DataTable)를 통째로 DB에 덮어쓰기 저장!
+        public bool UpdateTableData(string tableName, DataTable modifiedData)
+        {
+            try
+            {
+                using (SQLiteConnection conn = new SQLiteConnection(connectionString))
+                {
+                    conn.Open();
+                    // 저장할 땐 SELECT * 쿼리를 기반으로 CommandBuilder가 알아서 INSERT, UPDATE, DELETE SQL문을 만들어줍니다.
+                    using (SQLiteDataAdapter adapter = new SQLiteDataAdapter($"SELECT * FROM {tableName}", conn))
+                    using (SQLiteCommandBuilder builder = new SQLiteCommandBuilder(adapter))
+                    {
+                        adapter.Update(modifiedData);
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"DB Update Error: {ex.Message}");
+                return false;
+            }
+        }
+
+        // ====================================================================
+        // 📊 C# UI의 각 표(DataGridView)에 밀어넣을 기존 데이터 가져오기
         // ====================================================================
 
         // 💡 [마법의 번역기 AS 설명]

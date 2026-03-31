@@ -39,7 +39,7 @@ namespace Jubby_AutoTrade_UI.GUI
         private Size originalSize;
         private FormBorderStyle originalBorderStyle;
         private bool isMiniMode = false;
-        private int lastTradeCount = -1;
+        private string lastTradeTime = null;
         #endregion ## FormMain Define ##
 
         public FormMain()
@@ -72,6 +72,8 @@ namespace Jubby_AutoTrade_UI.GUI
         private void FormMain_Load(object sender, EventArgs e)
         {
             UIUpdate();
+
+            Auto.Ins.OnOrderDataRefreshed += CheckNewTradeAndNotify;
         }
         #endregion ## FormMain Load ##
 
@@ -385,8 +387,8 @@ namespace Jubby_AutoTrade_UI.GUI
                 originalBorderStyle = this.FormBorderStyle;  // 테두리 스타일 기억하기
 
                 this.FormBorderStyle = FormBorderStyle.None; // 테두리 다 날려버리기
-                this.Size = new Size(350, 150);              // 화면 구석에 둘 작고 귀여운 사이즈로 축소
-                this.TopMost = true;                         // 웹서핑/게임 중에도 항상 화면 맨 위에 띄우기!
+                this.Size = new Size(350, 60);              // 화면 구석에 둘 작고 귀여운 사이즈로 축소
+                this.TopMost = false;                         // 웹서핑/게임 중에도 항상 화면 맨 위에 띄우기!
 
                 // (선택) 미니 모드로 변신할 때 알림 띄우기
                 ShowToast("미니 모드 작동", "주삐가 미니 모드로 전환되었습니다.");
@@ -412,16 +414,77 @@ namespace Jubby_AutoTrade_UI.GUI
         // =========================================================================
         public void ShowToast(string title, string message)
         {
+            // 🔥 [핵심 추가] 아이콘이 비어있으면 윈도우 기본 아이콘(i 모양)을 억지로 끼워 넣습니다!
+            if (notifyIconMain.Icon == null)
+            {
+                notifyIconMain.Icon = SystemIcons.Information;
+            }
+
             // 트레이 아이콘이 없으면 알림을 띄울 수 없으므로 무조건 활성화
             notifyIconMain.Visible = true;
 
             // 알림창 세팅
-            notifyIconMain.BalloonTipTitle = title;         // 알림 제목
-            notifyIconMain.BalloonTipText = message;        // 알림 내용
-            notifyIconMain.BalloonTipIcon = ToolTipIcon.Info; // 아이콘 모양 (Info, Error, Warning 등)
+            notifyIconMain.BalloonTipTitle = title;
+            notifyIconMain.BalloonTipText = message;
+            notifyIconMain.BalloonTipIcon = ToolTipIcon.Info;
 
-            // 3초(3000ms) 동안 화면 우측 하단에 띄웁니다!
-            notifyIconMain.ShowBalloonTip(3000);
+            // 1초(1000ms) 동안 화면 우측 하단에 띄웁니다!
+            notifyIconMain.ShowBalloonTip(1000);
+        }
+
+        // =========================================================================
+        // 🔔 [자동매매 알림 로직] DB에 새 체결 내역이 들어왔는지 0.5초마다 감시합니다.
+        // =========================================================================
+        private void CheckNewTradeAndNotify(DataTable dt)
+        {
+            // 데이터가 없거나 비어있으면 패스
+            if (dt == null || dt.Rows.Count == 0 || isMiniMode == false) return;
+
+            // UI 스레드 충돌 방지 (Auto.cs는 백그라운드 스레드이므로 안전하게 넘겨받음)
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => CheckNewTradeAndNotify(dt)));
+                return;
+            }
+
+            try
+            {
+                // DB_Manager에서 ORDER BY id DESC (최신순)으로 가져오므로, 0번째 줄이 가장 최근 내역!
+                DataRow latestTrade = dt.Rows[0];
+                string currentTradeTime = latestTrade["Order_Time"].ToString();
+
+                // 프로그램 켜고 처음 읽었을 때는 예전 기록이므로 알림 안 띄우고 시간만 기억
+                if (lastTradeTime == null)
+                {
+                    lastTradeTime = currentTradeTime;
+                    return;
+                }
+
+                // 💡 가장 최근 체결 시간이 예전 기억과 다르다면? = 방금 새 주문이 체결되었다!
+                if (currentTradeTime != lastTradeTime)
+                {
+                    string stockName = latestTrade["Name"].ToString();
+                    string tradeType = latestTrade["Order_Type"].ToString();
+                    string profit = latestTrade["Order_Yield"].ToString();
+
+                    // 주문 종류에 맞게 예쁜 팝업 알림 발송
+                    if (tradeType.Contains("BUY") || tradeType.Contains("매수") || tradeType.Contains("ADD"))
+                    {
+                        ShowToast("🛒 주삐 신규 매수!", $"[{stockName}] 종목이 매수되었습니다.");
+                    }
+                    else if (tradeType.Contains("SELL") || tradeType.Contains("매도") || tradeType.Contains("절") || tradeType.Contains("비상"))
+                    {
+                        ShowToast("💰 주삐 매도 완료!", $"[{stockName}] 매도 완료! (수익률: {profit})");
+                    }
+
+                    // 알림을 띄웠으니, 다음 번 비교를 위해 방금 체결된 시간을 기억함
+                    lastTradeTime = currentTradeTime;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"알림 파싱 에러: {ex.Message}");
+            }
         }
         #endregion
     }

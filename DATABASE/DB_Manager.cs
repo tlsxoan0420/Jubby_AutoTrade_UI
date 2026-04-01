@@ -8,17 +8,55 @@ namespace Jubby_AutoTrade_UI.DATABASE
 {
     public class DB_Manager
     {
-        // 🔥 파이썬 코드에 적혀있던 그 절대 경로와 똑같이 맞춰줍니다.
-        private string dbPath = @"C:\Users\atrjk\OneDrive\바탕 화면\Program\04.Taemoo\Jubby Project\jubby_shared.db";
+        // 🔥 하드코딩된 절대 경로 삭제! 이제 프로그램이 스스로 경로를 찾아서 여기에 넣습니다.
+        private string dbPath;
         private string connectionString;
 
         public DB_Manager()
         {
-            // 💡 [핵심 마법의 주문 수정됨!]
+            // 💡 1. 프로그램이 켜질 때 똑똑하게 DB 위치를 찾아냅니다.
+            dbPath = GetSmartDbPath();
+
+            // 💡 2. 찾아낸 경로를 연결 문자열에 쏙 집어넣습니다.
             // C#에서도 DB 데이터를 직접 수정(Edit)하고 저장할 수 있도록 'Read Only=True' 옵션을 삭제했습니다!
             // Journal Mode=Wal 옵션은 유지하여 파이썬과 충돌(Locked)을 방지합니다.
             connectionString = $"Data Source={dbPath};Version=3;Journal Mode=Wal;";
         }
+
+        // =========================================================================
+        // 📂 [핵심 마법 추가] 파이썬과 완벽하게 동일한 위치의 DB를 찾아내는 함수
+        // =========================================================================
+        private string GetSmartDbPath()
+        {
+            string dbName = "jubby_shared.db";
+            string currentDir = AppDomain.CurrentDomain.BaseDirectory;
+
+            // 1. 빌드된 EXE 상태일 때: 현재 폴더에 DB가 있는지 먼저 확인 (최우선)
+            string directPath = Path.Combine(currentDir, dbName);
+            if (File.Exists(directPath))
+            {
+                return directPath;
+            }
+
+            // 2. Visual Studio 개발(디버그) 중일 때: bin/Debug/net... 폴더에 갇혀있으므로
+            // 파이썬이 만들어둔 DB가 나올 때까지 상위 폴더로 계속 거슬러 올라가며 탐색합니다.
+            DirectoryInfo dirInfo = new DirectoryInfo(currentDir);
+            while (dirInfo.Parent != null)
+            {
+                dirInfo = dirInfo.Parent;
+                string searchPath = Path.Combine(dirInfo.FullName, dbName);
+
+                if (File.Exists(searchPath))
+                {
+                    return searchPath; // 파이썬이 만든 진짜 DB 발견!
+                }
+            }
+
+            // 3. 정 못 찾았다면 일단 현재 폴더를 반환 (최초 실행 시 튕김 방지)
+            return directPath;
+        }
+
+        // =========================================================================
 
         /// <summary>
         /// [공통] 쿼리를 던지면 표(DataTable) 형태로 깔끔하게 포장해서 가져오는 함수

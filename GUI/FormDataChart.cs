@@ -55,6 +55,7 @@ namespace Jubby_AutoTrade_UI.GUI
 
                 // 2. 표가 갱신될 때마다 차트가 깜빡이거나 이벤트가 중복 폭주하는 것을 막기 위해 잠시 끕니다.
                 dgv.CellClick -= DgvChart_CellClick;
+                dgv.KeyUp -= DgvChart_KeyUp; // 🔥 방향키 이벤트 임시 해제
 
                 // 3. 파이썬이 넘겨준 최신 DB로 표를 덮어씁니다. (무한 누적 X)
                 dgv.DataSource = dt.Copy();
@@ -78,8 +79,9 @@ namespace Jubby_AutoTrade_UI.GUI
                     }
                 }
 
-                // 6. 클릭 이벤트를 다시 켭니다.
+                // 6. 이벤트들을 다시 켭니다.
                 dgv.CellClick += DgvChart_CellClick;
+                dgv.KeyUp += DgvChart_KeyUp; // 🔥 방향키 이벤트 재부착
             }
             catch { }
         }
@@ -146,10 +148,12 @@ namespace Jubby_AutoTrade_UI.GUI
 
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
-                // 🔥 기존의 잦은 SelectionChanged 이벤트를 완전히 삭제하고,
-                // 오직 '사용자가 직접 클릭했을 때만' 차트가 넘어가도록 'CellClick' 이벤트를 부착합니다!
+                // 🔥 마우스 클릭과 키보드 이벤트를 모두 부착합니다!
                 dgvChartArray[i].CellClick -= DgvChart_CellClick;
                 dgvChartArray[i].CellClick += DgvChart_CellClick;
+
+                dgvChartArray[i].KeyUp -= DgvChart_KeyUp;
+                dgvChartArray[i].KeyUp += DgvChart_KeyUp;
 
                 // 디자인 포장용 필터 부착
                 dgvChartArray[i].CellFormatting -= DgvChart_CellFormatting;
@@ -245,19 +249,17 @@ namespace Jubby_AutoTrade_UI.GUI
         }
 
         // =========================================================================
-        // 🖱️ [클릭 이벤트] 클릭한 종목의 차트를 화면 상단에 즉각 띄워줍니다!
+        // 🎯 [공통 함수] 마우스나 키보드로 선택된 줄의 차트를 그려줍니다.
         // =========================================================================
-        private void DgvChart_CellClick(object sender, DataGridViewCellEventArgs e)
+        private void UpdateChartFromSelectedRow(DataGridView dgv)
         {
             try
             {
-                if (e.RowIndex < 0) return; // 헤더 부분(제목) 클릭은 무시
-
-                DataGridView dgv = sender as DataGridView;
                 if (dgv == null || !dgv.Columns.Contains("Symbol")) return;
+                if (dgv.CurrentRow == null || dgv.CurrentRow.Index < 0) return;
 
-                // 클릭한 줄에서 'Symbol(종목코드)'을 추출합니다.
-                string symbol = dgv.Rows[e.RowIndex].Cells["Symbol"].Value?.ToString();
+                // 선택된 줄에서 'Symbol(종목코드)'을 추출합니다.
+                string symbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
 
                 if (string.IsNullOrWhiteSpace(symbol) || symbol == "-") return;
 
@@ -265,6 +267,27 @@ namespace Jubby_AutoTrade_UI.GUI
                 Auto.Ins.formGraphic?.ShowStock(symbol);
             }
             catch { }
+        }
+
+        // =========================================================================
+        // 🖱️ [마우스 이벤트]
+        // =========================================================================
+        private void DgvChart_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return; // 헤더 부분(제목) 클릭은 무시
+            UpdateChartFromSelectedRow(sender as DataGridView);
+        }
+
+        // =========================================================================
+        // ⌨️ [키보드 이벤트]
+        // =========================================================================
+        private void DgvChart_KeyUp(object sender, KeyEventArgs e)
+        {
+            // 사용자가 위(Up) 또는 아래(Down) 방향키를 눌렀을 때만 차트 업데이트!
+            if (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down)
+            {
+                UpdateChartFromSelectedRow(sender as DataGridView);
+            }
         }
     }
 

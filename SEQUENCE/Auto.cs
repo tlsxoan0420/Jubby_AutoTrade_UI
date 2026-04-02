@@ -127,12 +127,15 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
             }
         }
 
-        // DB 컬럼이 비어있거나 이상한 값이어도 뻗지 않게 막아주는 방패
+        // 🔥 [수정된 방패 함수] DB 컬럼이 비어있거나 콤마(,)가 있어도 뻗지 않게 막아줍니다.
         private decimal SafeGetDecimal(DataRow row, string colName)
         {
             if (row.Table.Columns.Contains(colName) && row[colName] != DBNull.Value)
             {
-                if (decimal.TryParse(row[colName].ToString(), out decimal result))
+                // 🔥 파이썬에서 넘어온 "8,370" 같은 콤마나 "%" 기호를 싹 지워야 정상적인 숫자로 바뀝니다!
+                string cleanStr = row[colName].ToString().Replace(",", "").Replace("%", "").Trim();
+
+                if (decimal.TryParse(cleanStr, out decimal result))
                     return result;
             }
             return 0;

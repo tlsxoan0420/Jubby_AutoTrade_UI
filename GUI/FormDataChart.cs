@@ -34,7 +34,7 @@ namespace Jubby_AutoTrade_UI.GUI
 
         private void UpdateGridDataSource(DataGridView dgv, DataTable dt)
         {
-            if (dgv == null || !dgv.IsHandleCreated || this.IsDisposed) return;
+            if (dgv == null || !dgv.IsHandleCreated || this.IsDisposed || dt == null) return;
 
             if (dgv.InvokeRequired)
             {
@@ -44,66 +44,97 @@ namespace Jubby_AutoTrade_UI.GUI
 
             try
             {
+                // 1. 현재 스크롤 위치와 클릭해둔 종목(Symbol)을 기억합니다.
                 int scrollIdx = dgv.FirstDisplayedScrollingRowIndex;
-                int selectedIdx = dgv.CurrentRow?.Index ?? -1;
+                string selectedSymbol = "";
 
-                dgv.DataSource = dt;
+                if (dgv.CurrentRow != null && dgv.Columns.Contains("Symbol"))
+                {
+                    selectedSymbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
+                }
 
-                if (scrollIdx >= 0 && scrollIdx < dgv.RowCount) dgv.FirstDisplayedScrollingRowIndex = scrollIdx;
-                if (selectedIdx >= 0 && selectedIdx < dgv.RowCount) dgv.Rows[selectedIdx].Selected = true;
+                // 2. 표가 갱신될 때마다 차트가 깜빡이거나 이벤트가 중복 폭주하는 것을 막기 위해 잠시 끕니다.
+                dgv.CellClick -= DgvChart_CellClick;
 
-                ApplyCustomFormatting(dgv);
+                // 3. 파이썬이 넘겨준 최신 DB로 표를 덮어씁니다. (무한 누적 X)
+                dgv.DataSource = dt.Copy();
+
+                // 4. 아까 기억해둔 스크롤 위치로 되돌립니다.
+                if (scrollIdx >= 0 && scrollIdx < dgv.RowCount)
+                    dgv.FirstDisplayedScrollingRowIndex = scrollIdx;
+
+                // 5. 아까 선택해뒀던 종목을 다시 파란색으로 칠해주고 포커스를 유지합니다! (마법의 클릭 유지)
+                if (!string.IsNullOrEmpty(selectedSymbol))
+                {
+                    dgv.ClearSelection();
+                    foreach (DataGridViewRow r in dgv.Rows)
+                    {
+                        if (r.Cells["Symbol"].Value?.ToString() == selectedSymbol)
+                        {
+                            r.Selected = true;
+                            dgv.CurrentCell = r.Cells[0]; // 포커스 이동 (스크롤 고정용)
+                            break;
+                        }
+                    }
+                }
+
+                // 6. 클릭 이벤트를 다시 켭니다.
+                dgv.CellClick += DgvChart_CellClick;
             }
             catch { }
         }
 
-        private void ApplyCustomFormatting(DataGridView dgv)
+        // =========================================================================
+        // 🎨 [마법의 필터] 데이터 원본은 지키면서 화면에만 예쁘게 색칠해주는 이벤트!
+        // =========================================================================
+        private void DgvChart_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
         {
-            foreach (DataGridViewRow row in dgv.Rows)
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.Value == null) return;
+
+            DataGridView dgv = sender as DataGridView;
+            string colName = dgv.Columns[e.ColumnIndex].Name;
+            string valStr = e.Value.ToString();
+
+            // 1. 번호 매기기 (첫 번째 열)
+            if (colName == "No")
             {
-                // 번호 매기기 (첫 번째 열)
-                if (dgv.Columns.Contains("No")) row.Cells["No"].Value = row.Index + 1;
+                e.Value = (e.RowIndex + 1).ToString();
+                e.FormattingApplied = true;
+                return;
+            }
 
-                foreach (DataGridViewCell cell in row.Cells)
+            // 2. 수익률 / 등락률 색상 입히기 및 % 기호 붙이기
+            if (colName == "Pnl_Rate" || colName == "Return_1m" || colName == "Order_Yield")
+            {
+                if (double.TryParse(valStr.Replace("%", "").Replace(",", ""), out double val))
                 {
-                    if (cell.OwningColumn == null || cell.Value == null) continue;
-                    string colName = cell.OwningColumn.Name;
-                    string valStr = cell.Value.ToString();
+                    if (val > 0) e.CellStyle.ForeColor = Color.Red;
+                    else if (val < 0) e.CellStyle.ForeColor = Color.DeepSkyBlue;
+                    else e.CellStyle.ForeColor = Color.WhiteSmoke;
 
-                    // 1. 수익률 / 등락률 색상 입히기
-                    if (colName == "Pnl_Rate" || colName == "Return_1m" || colName == "Order_Yield")
-                    {
-                        if (double.TryParse(valStr.Replace("%", "").Replace(",", ""), out double val))
-                        {
-                            if (val > 0) cell.Style.ForeColor = Color.Red;
-                            else if (val < 0) cell.Style.ForeColor = Color.DeepSkyBlue;
-                            else cell.Style.ForeColor = Color.WhiteSmoke;
-
-                            // % 기호 붙여주기
-                            cell.Value = $"{val:F2}%";
-                        }
-                    }
-
-                    // 2. 주문 종류 및 상태를 한글로 완벽 번역 (BUY -> 매수)
-                    else if (colName == "Order_Type" || colName == "Status" || colName == "Signal")
-                    {
-                        string upperVal = valStr.ToUpper();
-                        if (upperVal.Contains("SELL_PROFIT")) { cell.Value = "익절"; cell.Style.ForeColor = Color.DeepSkyBlue; }
-                        else if (upperVal.Contains("SELL_LOSS")) { cell.Value = "손절"; cell.Style.ForeColor = Color.DeepSkyBlue; }
-                        else if (upperVal.Contains("SELL") || upperVal.Contains("매도")) { cell.Value = "매도"; cell.Style.ForeColor = Color.DeepSkyBlue; }
-                        else if (upperVal.Contains("BUY") || upperVal.Contains("매수")) { cell.Value = "매수"; cell.Style.ForeColor = Color.Red; }
-                        else if (upperVal.Contains("WAIT")) { cell.Value = "대기"; cell.Style.ForeColor = Color.Yellow; }
-                    }
-
-                    // 3. 숫자가 들어간 칸은 천단위 콤마(,)와 함께 소수점 싹 제거 (한국 주식 맞춤 정수)
-                    else if (colName.Contains("Price") || colName.Contains("Quantity") || colName.Contains("Amount") || colName.Contains("Pnl") || colName.Contains("Cash") || colName == "Ma_5" || colName == "Ma_20" || colName == "Volume")
-                    {
-                        string rawValue = valStr.Replace(",", ""); // 이미 콤마가 있다면 제거
-                        if (double.TryParse(rawValue, out double numVal))
-                        {
-                            cell.Value = numVal.ToString("N0"); // 여기서 다시 천단위 콤마를 예쁘게 찍어줌
-                        }
-                    }
+                    e.Value = $"{val:F2}%";
+                    e.FormattingApplied = true;
+                }
+            }
+            // 3. 주문 종류를 한글로 완벽 번역
+            else if (colName == "Order_Type" || colName == "Status" || colName == "Signal")
+            {
+                string upperVal = valStr.ToUpper();
+                if (upperVal.Contains("SELL_PROFIT")) { e.Value = "익절"; e.CellStyle.ForeColor = Color.DeepSkyBlue; }
+                else if (upperVal.Contains("SELL_LOSS")) { e.Value = "손절"; e.CellStyle.ForeColor = Color.DeepSkyBlue; }
+                else if (upperVal.Contains("SELL") || upperVal.Contains("매도")) { e.Value = "매도"; e.CellStyle.ForeColor = Color.DeepSkyBlue; }
+                else if (upperVal.Contains("BUY") || upperVal.Contains("매수") || upperVal.Contains("ADD")) { e.Value = "매수"; e.CellStyle.ForeColor = Color.Red; }
+                else if (upperVal.Contains("WAIT")) { e.Value = "대기"; e.CellStyle.ForeColor = Color.Yellow; }
+                e.FormattingApplied = true;
+            }
+            // 4. 숫자에 천단위 콤마(,) 렌더링
+            else if (colName.Contains("Price") || colName.Contains("Quantity") || colName.Contains("Amount") || colName.Contains("Pnl") || colName.Contains("Cash") || colName.Contains("Size") || colName == "Ma_5" || colName == "Ma_20" || colName == "Volume")
+            {
+                string rawValue = valStr.Replace(",", "");
+                if (double.TryParse(rawValue, out double numVal))
+                {
+                    e.Value = numVal.ToString("N0");
+                    e.FormattingApplied = true;
                 }
             }
         }
@@ -115,8 +146,15 @@ namespace Jubby_AutoTrade_UI.GUI
 
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
-                dgvChartArray[i].SelectionChanged -= DgvChart_SelectionChanged;
-                dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
+                // 🔥 기존의 잦은 SelectionChanged 이벤트를 완전히 삭제하고,
+                // 오직 '사용자가 직접 클릭했을 때만' 차트가 넘어가도록 'CellClick' 이벤트를 부착합니다!
+                dgvChartArray[i].CellClick -= DgvChart_CellClick;
+                dgvChartArray[i].CellClick += DgvChart_CellClick;
+
+                // 디자인 포장용 필터 부착
+                dgvChartArray[i].CellFormatting -= DgvChart_CellFormatting;
+                dgvChartArray[i].CellFormatting += DgvChart_CellFormatting;
+
                 SetGridStyle(dgvChartArray[i], i);
                 dgvChartArray[i].AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             }
@@ -124,9 +162,7 @@ namespace Jubby_AutoTrade_UI.GUI
 
         private void SetGridStyle(DataGridView dgv, int ChartIndex)
         {
-            // 🔥 [핵심] AutoGenerateColumns를 false로 해야 표가 중복해서 생기지 않습니다!
             dgv.AutoGenerateColumns = false;
-
             dgv.DoubleBuffered(true); dgv.AllowUserToAddRows = false; dgv.RowHeadersVisible = false;
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dgv.ReadOnly = true;
             dgv.BorderStyle = BorderStyle.None; dgv.BackgroundColor = Color.FromArgb(5, 5, 15);
@@ -138,18 +174,22 @@ namespace Jubby_AutoTrade_UI.GUI
             dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.LightGray;
             dgv.ColumnHeadersDefaultCellStyle.Font = new Font("HY헤드라인M", 11, FontStyle.Bold);
             dgv.ColumnHeadersHeight = 35;
-            dgv.DataError += (s, e) => { e.ThrowException = false; }; // 에러 무시하고 계속 진행
+            dgv.DataError += (s, e) => { e.ThrowException = false; };
 
-            // 컬럼 매핑: DataPropertyName 을 DB_Manager.cs 의 Alias 와 똑같이 맞춰줍니다.
             if (dgv.Columns.Count == 0 && ChartIndex == 0) // 마켓
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Last_Price", "현재가", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Open_Price", "시가", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "High_Price", "고가", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Low_Price", "저가", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Bid_Price", "매수호가", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Ask_Price", "매도호가", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Bid_Size", "매수잔량", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Ask_Size", "매도잔량", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Return_1m", "1분등락률", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Trade_Amount", "거래대금", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Vol_Energy", "거래량에너지", 60, DataGridViewContentAlignment.MiddleCenter);
@@ -159,6 +199,7 @@ namespace Jubby_AutoTrade_UI.GUI
             else if (dgv.Columns.Count == 0 && ChartIndex == 1) // 계좌
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Quantity", "보유수량", 60, DataGridViewContentAlignment.MiddleCenter);
@@ -171,19 +212,20 @@ namespace Jubby_AutoTrade_UI.GUI
             else if (dgv.Columns.Count == 0 && ChartIndex == 2) // 주문
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Order_Time", "주문시간", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Type", "주문종류", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Price", "주문가격", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Quantity", "주문수량", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Filled_Quqntity", "체결수량", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Order_Time", "주문시간", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Status", "주문상태", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Yield", "수익률", 60, DataGridViewContentAlignment.MiddleCenter);
             }
             else if (dgv.Columns.Count == 0 && ChartIndex == 3) // 전략
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Ma_5", "단기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);
@@ -197,25 +239,30 @@ namespace Jubby_AutoTrade_UI.GUI
         private void AddColumn(DataGridView dgv, string dataPropertyName, string headerText, int width, DataGridViewContentAlignment align)
         {
             int idx = dgv.Columns.Add(dataPropertyName, headerText);
-            // 🔥 마법의 매핑: DB에서 가져온 'Symbol'이 UI의 '종목코드' 헤더 칸에 자동으로 들어갑니다.
             dgv.Columns[idx].DataPropertyName = dataPropertyName;
             dgv.Columns[idx].Width = width;
             dgv.Columns[idx].DefaultCellStyle.Alignment = align;
         }
 
-        private void DgvChart_SelectionChanged(object sender, EventArgs e)
+        // =========================================================================
+        // 🖱️ [클릭 이벤트] 클릭한 종목의 차트를 화면 상단에 즉각 띄워줍니다!
+        // =========================================================================
+        private void DgvChart_CellClick(object sender, DataGridViewCellEventArgs e)
         {
             try
             {
-                DataGridView dgv = sender as DataGridView;
-                if (dgv == null || dgv.CurrentRow == null) return;
+                if (e.RowIndex < 0) return; // 헤더 부분(제목) 클릭은 무시
 
-                string symbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
+                DataGridView dgv = sender as DataGridView;
+                if (dgv == null || !dgv.Columns.Contains("Symbol")) return;
+
+                // 클릭한 줄에서 'Symbol(종목코드)'을 추출합니다.
+                string symbol = dgv.Rows[e.RowIndex].Cells["Symbol"].Value?.ToString();
 
                 if (string.IsNullOrWhiteSpace(symbol) || symbol == "-") return;
 
-                var chartForm = Application.OpenForms.OfType<FormGraphic>().FirstOrDefault();
-                chartForm?.ShowStock(symbol);
+                // 🔥 시스템 심장부(Auto.Ins)에 이미 열려있는 차트 창(formGraphic)을 다이렉트로 호출하여 차트를 바꿉니다!
+                Auto.Ins.formGraphic?.ShowStock(symbol);
             }
             catch { }
         }

@@ -312,21 +312,30 @@ namespace Jubby_AutoTrade_UI.GUI
             var allStocks = Auto.Ins.GetStockList();
             if (allStocks == null || allStocks.Count == 0) return;
 
+            // 1. 최초 1회 실행 시 (1개만 넣던 버그 수정!)
             if (!firstSetDone)
             {
                 firstSetDone = true;
-                var firstInfo = allStocks.FirstOrDefault();
-                if (firstInfo != null)
-                {
-                    SetStockList(new List<JubbyStockInfo> { firstInfo });
-                }
+                // 🔥 [수정] 첫 번째 1개가 아니라, 가져온 '모든 종목 리스트'를 통째로 넘겨줍니다!
+                SetStockList(allStocks);
                 return;
+            }
+
+            // 2. 🔥 [추가] 중간에 새로운 종목이 수집/매수되어 리스트가 늘어났을 때의 동기화
+            if (allStocks.Count != StockList.Count)
+            {
+                string curSymbol = StockList.Count > 0 ? StockList[CurrentIndex].Symbol : "";
+                StockList = allStocks;
+                int idx = StockList.FindIndex(x => x.Symbol == curSymbol);
+                CurrentIndex = idx >= 0 ? idx : 0;
             }
 
             if (StockList == null || StockList.Count == 0 || CurrentIndex < 0 || CurrentIndex >= StockList.Count)
                 return;
 
+            // 3. 현재 차트에 표시 중인 종목
             string symbol = StockList[CurrentIndex].Symbol;
+
             var info = Auto.Ins.GetStock(symbol);
             if (info == null) return;
 

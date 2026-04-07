@@ -94,6 +94,14 @@ namespace Jubby_AutoTrade_UI.GUI
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || e.Value == null) return;
 
             DataGridView dgv = sender as DataGridView;
+            // 🚀 컬럼 이름이 "No"이거나 헤더 텍스트가 "번호"인 경우 숫자를 매깁니다.
+            if (dgv.Columns[e.ColumnIndex].Name == "No" || dgv.Columns[e.ColumnIndex].HeaderText == "번호")
+            {
+                e.Value = (e.RowIndex + 1).ToString();
+                e.FormattingApplied = true;
+                return;
+            }
+
             string colName = dgv.Columns[e.ColumnIndex].Name;
             string valStr = e.Value.ToString();
 

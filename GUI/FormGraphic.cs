@@ -36,6 +36,7 @@ namespace Jubby_AutoTrade_UI.GUI
         private readonly Dictionary<string, List<double>> LiveVolumeData = new Dictionary<string, List<double>>();
         private readonly Dictionary<string, List<OHLC>> BackupOHLCData = new Dictionary<string, List<OHLC>>();
         private readonly Dictionary<string, List<double>> BackupVolumeData = new Dictionary<string, List<double>>();
+        private bool isAutoAxis = true;
 
         public FormGraphic() { InitializeComponent(); UI_Organize(); }
 
@@ -97,8 +98,15 @@ namespace Jubby_AutoTrade_UI.GUI
                 if (!isBackupMode || BackupOHLCData.Count == 0) { MessageBox.Show("먼저 '백업 데이터 불러오기'로 CSV 파일을 열어주세요!", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
                 RunVirtualBacktest();
             };
-            CustomChartMenu.Items.Add(itemSave); CustomChartMenu.Items.Add(itemAutoFit); CustomChartMenu.Items.Add(new ToolStripSeparator());
-            CustomChartMenu.Items.Add(itemLoadBackup); CustomChartMenu.Items.Add(new ToolStripSeparator()); CustomChartMenu.Items.Add(itemBacktest);
+            CustomChartMenu.Items.Add(new ToolStripSeparator()); // 구분선
+            ToolStripMenuItem itemToggleAuto = new ToolStripMenuItem("실시간 자동 화면 맞춤 ON/OFF");
+            itemToggleAuto.Click += (s, e) => {
+                isAutoAxis = !isAutoAxis;
+                itemToggleAuto.Checked = isAutoAxis;
+                if (isAutoAxis) { FormsPlotMain.Plot.Axes.AutoScale(); FormsPlotMain.Refresh(); }
+            };
+            itemToggleAuto.Checked = true; // 기본값 ON
+            CustomChartMenu.Items.Add(itemToggleAuto);
         }
 
         private void RunVirtualBacktest()
@@ -227,7 +235,6 @@ namespace Jubby_AutoTrade_UI.GUI
 
             // 우측 상단 범례(Legend) 표시 켜기
             plt.Legend.IsVisible = true;
-            plt.Legend.Location = Alignment.UpperRight;
 
             ChartInitialized = true;
         }
@@ -236,28 +243,53 @@ namespace Jubby_AutoTrade_UI.GUI
         {
             try
             {
+                // 1. 차트가 초기화되지 않았다면 초기화 수행
                 if (!ChartInitialized) InitChart();
-                OHLCList.Clear(); OrderHistoryList.Clear();
-                if (isBackupMode && BackupOHLCData.ContainsKey(info.Symbol)) { OHLCList.AddRange(BackupOHLCData[info.Symbol]); OrderHistoryList.AddRange(BackupVolumeData[info.Symbol]); }
-                else if (!isBackupMode && LiveOHLCData.ContainsKey(info.Symbol)) { OHLCList.AddRange(LiveOHLCData[info.Symbol]); OrderHistoryList.AddRange(LiveVolumeData[info.Symbol]); }
 
+                // 2. 기존 리스트 비우고 새로운 종목 데이터로 채우기
+                OHLCList.Clear();
+                OrderHistoryList.Clear();
+
+                if (isBackupMode && BackupOHLCData.ContainsKey(info.Symbol))
+                {
+                    OHLCList.AddRange(BackupOHLCData[info.Symbol]);
+                    OrderHistoryList.AddRange(BackupVolumeData[info.Symbol]);
+                }
+                else if (!isBackupMode && LiveOHLCData.ContainsKey(info.Symbol))
+                {
+                    OHLCList.AddRange(LiveOHLCData[info.Symbol]);
+                    OrderHistoryList.AddRange(LiveVolumeData[info.Symbol]);
+                }
+
+                // 3. 캔들 및 매매 타점 마커 다시 그리기
                 ReDrawChartComplete();
                 UpdateOrderMarkers(info.GetOrderListSafe());
 
-                // 영어 타이틀로 갱신
+                // 4. 타이틀 갱신
                 FormsPlotMain.Plot.Title($"JUBBY AI CHART - [{info.Symbol}]");
-                FormsPlotMain.Plot.Axes.AutoScale();
 
-                // 만약 캔들이 딱 1개밖에 없다면 화면에 꽉 차서 거대한 벽처럼 보이지 않도록 강제로 좌우 여백을 줍니다!
-                if (OHLCList.Count == 1)
+                // =============================================================
+                // ⭐ [핵심 수정] 사용자가 '자동 맞춤'을 켰을 때만 화면을 리셋합니다.
+                // =============================================================
+                if (isAutoAxis) // 우클릭 메뉴의 ON/OFF 스위치 변수
                 {
-                    double xCenter = OHLCList[0].DateTime.ToOADate();
-                    FormsPlotMain.Plot.Axes.SetLimitsX(xCenter - 0.002, xCenter + 0.002);
-                }
+                    // 전체 데이터를 한 화면에 다 보여주도록 축 자동 조정
+                    FormsPlotMain.Plot.Axes.AutoScale();
 
+                    // [가독성 보정] 데이터가 너무 적을(10개 미만) 때 캔들이 너무 뚱뚱해지는 것 방지
+                    if (OHLCList.Count > 0 && OHLCList.Count < 10)
+                    {
+                        double xLast = OHLCList.Last().DateTime.ToOADate();
+                        // 마지막 캔들 기준으로 좌측으로 약간의 여백을 강제로 줌
+                        FormsPlotMain.Plot.Axes.SetLimitsX(xLast - 0.01, xLast + 0.002);
+                    }
+                }
+                // else: isAutoAxis가 False(OFF)라면, 사용자가 마우스 휠로 확대한 현재 범위를 그대로 유지함
+
+                // 5. 최종 화면 새로고침
                 FormsPlotMain.Refresh();
             }
-            catch { } // 안전망
+            catch { } // 데이터 동기화 중 에러 방지용 안전망
         }
 
         private void UpdateOrderMarkers(List<Flag.TradeOrderData> orders)

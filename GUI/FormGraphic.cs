@@ -37,6 +37,7 @@ namespace Jubby_AutoTrade_UI.GUI
         private readonly Dictionary<string, List<OHLC>> BackupOHLCData = new Dictionary<string, List<OHLC>>();
         private readonly Dictionary<string, List<double>> BackupVolumeData = new Dictionary<string, List<double>>();
         private bool isAutoAxis = true;
+        private string lastLoadedSymbol = ""; // 🔥 [추가] 종목이 변경되었는지 감지하여 불필요한 차트 깜빡임을 막는 변수
 
         public FormGraphic() { InitializeComponent(); UI_Organize(); }
 
@@ -214,8 +215,18 @@ namespace Jubby_AutoTrade_UI.GUI
 
         private void ReDrawChartComplete()
         {
+            // 🌟 [수정 4 - 차트 비우기 마법] 기존에 그려진 캔들이 있다면 무조건 화면에서 뽑아버립니다!
+            if (CandlePlot != null)
+            {
+                FormsPlotMain.Plot.Remove(CandlePlot);
+                CandlePlot = null;
+            }
+
+            // 🌟 [핵심] 만약 데이터가 0개라면? 새 캔들을 그리지 않고 여기서 즉시 함수를 끝냅니다.
+            // 결과적으로 차트에는 아무것도 없는 자연스러운 빈 화면이 유지됩니다.
             if (OHLCList.Count == 0) return;
-            if (CandlePlot != null) FormsPlotMain.Plot.Remove(CandlePlot);
+
+            // 데이터가 있을 때만 정상적으로 캔들 추가
             CandlePlot = FormsPlotMain.Plot.Add.Candlestick(OHLCList.ToArray());
         }
 
@@ -243,10 +254,12 @@ namespace Jubby_AutoTrade_UI.GUI
         {
             try
             {
-                // 1. 차트가 초기화되지 않았다면 초기화 수행
                 if (!ChartInitialized) InitChart();
 
-                // 2. 기존 리스트 비우고 새로운 종목 데이터로 채우기
+                // 🌟 [핵심 보정] 현재 보여줄 차트의 종목이 이전과 다르게 '바뀌었는지' 체크합니다.
+                bool isSymbolChanged = (lastLoadedSymbol != info.Symbol);
+                lastLoadedSymbol = info.Symbol;
+
                 OHLCList.Clear();
                 OrderHistoryList.Clear();
 
@@ -261,35 +274,31 @@ namespace Jubby_AutoTrade_UI.GUI
                     OrderHistoryList.AddRange(LiveVolumeData[info.Symbol]);
                 }
 
-                // 3. 캔들 및 매매 타점 마커 다시 그리기
+                // 🌟 [수정 2] 데이터가 0개면 차트가 비워지도록 지시합니다.
                 ReDrawChartComplete();
                 UpdateOrderMarkers(info.GetOrderListSafe());
 
-                // 4. 타이틀 갱신
                 FormsPlotMain.Plot.Title($"JUBBY AI CHART - [{info.Symbol}]");
 
                 // =============================================================
-                // ⭐ [핵심 수정] 사용자가 '자동 맞춤'을 켰을 때만 화면을 리셋합니다.
+                // ⭐ [핵심 보정 3] "종목이 새로 클릭되었을 때"만 자동 화면 맞춤 실행!
+                // 이렇게 하면 실시간 데이터가 1개씩 추가될 때 화면이 강제로 리셋되지 않아
+                // 쾌적하게 마우스 휠로 확대/축소하면서 차트를 볼 수 있습니다.
                 // =============================================================
-                if (isAutoAxis) // 우클릭 메뉴의 ON/OFF 스위치 변수
+                if (isAutoAxis && isSymbolChanged)
                 {
-                    // 전체 데이터를 한 화면에 다 보여주도록 축 자동 조정
                     FormsPlotMain.Plot.Axes.AutoScale();
 
-                    // [가독성 보정] 데이터가 너무 적을(10개 미만) 때 캔들이 너무 뚱뚱해지는 것 방지
                     if (OHLCList.Count > 0 && OHLCList.Count < 10)
                     {
                         double xLast = OHLCList.Last().DateTime.ToOADate();
-                        // 마지막 캔들 기준으로 좌측으로 약간의 여백을 강제로 줌
                         FormsPlotMain.Plot.Axes.SetLimitsX(xLast - 0.01, xLast + 0.002);
                     }
                 }
-                // else: isAutoAxis가 False(OFF)라면, 사용자가 마우스 휠로 확대한 현재 범위를 그대로 유지함
 
-                // 5. 최종 화면 새로고침
                 FormsPlotMain.Refresh();
             }
-            catch { } // 데이터 동기화 중 에러 방지용 안전망
+            catch { }
         }
 
         private void UpdateOrderMarkers(List<Flag.TradeOrderData> orders)

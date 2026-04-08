@@ -12,6 +12,7 @@ namespace Jubby_AutoTrade_UI.GUI
     public partial class FormDataChart : Form
     {
         private DataGridView[] dgvChartArray;
+        private bool isUpdatingGrid = false; // 🔥 [추가] 표 내용 교체 중 차트 조작 이벤트 폭주를 막는 잠금 변수
 
         public FormDataChart()
         {
@@ -35,36 +36,21 @@ namespace Jubby_AutoTrade_UI.GUI
         private void UpdateGridDataSource(DataGridView dgv, DataTable dt)
         {
             if (dgv == null || !dgv.IsHandleCreated || this.IsDisposed || dt == null) return;
-
-            if (dgv.InvokeRequired)
-            {
-                dgv.BeginInvoke(new Action(() => UpdateGridDataSource(dgv, dt)));
-                return;
-            }
+            if (dgv.InvokeRequired) { dgv.BeginInvoke(new Action(() => UpdateGridDataSource(dgv, dt))); return; }
 
             try
             {
-                // 1. 현재 스크롤 위치와 클릭해둔 종목(Symbol)을 기억합니다.
+                isUpdatingGrid = true; // 🌟 락 온! (데이터를 교체하는 동안에는 유저 클릭/이동 이벤트를 무시함)
+
                 int scrollIdx = dgv.FirstDisplayedScrollingRowIndex;
                 string selectedSymbol = "";
+                if (dgv.CurrentRow != null && dgv.Columns.Contains("Symbol")) selectedSymbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
 
-                if (dgv.CurrentRow != null && dgv.Columns.Contains("Symbol"))
-                {
-                    selectedSymbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
-                }
+                dgv.CellClick -= DgvChart_CellClick; // (기존 쓰레기 이벤트 안전장치 제거)
 
-                // 2. 표가 갱신될 때마다 차트가 깜빡이거나 이벤트가 중복 폭주하는 것을 막기 위해 잠시 끕니다.
-                dgv.CellClick -= DgvChart_CellClick;
-                dgv.KeyUp -= DgvChart_KeyUp; // 🔥 방향키 이벤트 임시 해제
-
-                // 3. 파이썬이 넘겨준 최신 DB로 표를 덮어씁니다. (무한 누적 X)
                 dgv.DataSource = dt.Copy();
 
-                // 4. 아까 기억해둔 스크롤 위치로 되돌립니다.
-                if (scrollIdx >= 0 && scrollIdx < dgv.RowCount)
-                    dgv.FirstDisplayedScrollingRowIndex = scrollIdx;
-
-                // 5. 아까 선택해뒀던 종목을 다시 파란색으로 칠해주고 포커스를 유지합니다! (마법의 클릭 유지)
+                if (scrollIdx >= 0 && scrollIdx < dgv.RowCount) dgv.FirstDisplayedScrollingRowIndex = scrollIdx;
                 if (!string.IsNullOrEmpty(selectedSymbol))
                 {
                     dgv.ClearSelection();
@@ -73,17 +59,17 @@ namespace Jubby_AutoTrade_UI.GUI
                         if (r.Cells["Symbol"].Value?.ToString() == selectedSymbol)
                         {
                             r.Selected = true;
-                            dgv.CurrentCell = r.Cells[0]; // 포커스 이동 (스크롤 고정용)
+                            dgv.CurrentCell = r.Cells[0];
                             break;
                         }
                     }
                 }
-
-                // 6. 이벤트들을 다시 켭니다.
-                dgv.CellClick += DgvChart_CellClick;
-                dgv.KeyUp += DgvChart_KeyUp; // 🔥 방향키 이벤트 재부착
             }
             catch { }
+            finally
+            {
+                isUpdatingGrid = false; // 🌟 락 오프! (데이터 교체 완료, 유저 키보드/마우스 조작 다시 접수 시작)
+            }
         }
 
         // =========================================================================
@@ -156,20 +142,26 @@ namespace Jubby_AutoTrade_UI.GUI
 
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
-                // 🔥 마우스 클릭과 키보드 이벤트를 모두 부착합니다!
-                dgvChartArray[i].CellClick -= DgvChart_CellClick;
-                dgvChartArray[i].CellClick += DgvChart_CellClick;
+                // 🔥 기존의 버벅이던 CellClick과 KeyUp 이벤트를 완전히 삭제하고!
+                // 마우스/키보드 모든 조작(위아래 꾹 누르기 포함)에 부드럽고 즉각적으로 반응하는 'SelectionChanged' 로 통합합니다.
+                dgvChartArray[i].SelectionChanged -= DgvChart_SelectionChanged;
+                dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
 
-                dgvChartArray[i].KeyUp -= DgvChart_KeyUp;
-                dgvChartArray[i].KeyUp += DgvChart_KeyUp;
-
-                // 디자인 포장용 필터 부착
                 dgvChartArray[i].CellFormatting -= DgvChart_CellFormatting;
                 dgvChartArray[i].CellFormatting += DgvChart_CellFormatting;
 
                 SetGridStyle(dgvChartArray[i], i);
                 dgvChartArray[i].AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             }
+        }
+
+        private void DgvChart_SelectionChanged(object sender, EventArgs e)
+        {
+            // 🌟 백그라운드에서 표 데이터가 1초마다 최신화(통째로 교체) 되는 찰나에는 차트 전환을 무시합니다. (깜빡임 완벽 제거)
+            if (isUpdatingGrid) return;
+
+            // 키보드든 마우스든 선택된 줄이 바뀌면 무조건 이 코드가 즉시 실행되어 차트를 변경합니다.
+            UpdateChartFromSelectedRow(sender as DataGridView);
         }
 
         private void SetGridStyle(DataGridView dgv, int ChartIndex)

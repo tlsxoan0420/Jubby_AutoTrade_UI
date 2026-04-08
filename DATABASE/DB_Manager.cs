@@ -182,8 +182,11 @@ namespace Jubby_AutoTrade_UI.DATABASE
         // 4. 매매 체결 영수증 데이터 (Order Table 용) - 최신 500개만
         public DataTable GetTradeHistory()
         {
-            // 최신 거래가 맨 위로 오도록 내림차순(DESC) 정렬
-            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, order_type AS Order_Type, order_price AS Order_Price, order_quantity AS Order_Quantity, filled_quantity AS Filled_Quqntity, order_time AS Order_Time, Status AS Status, order_yield AS Order_Yield FROM TradeHistory ORDER BY id DESC LIMIT 500");
+            // 🔥 [수정 1] 파이썬 DB의 최신 컬럼명(type, quantity)을
+            // C# 표의 이름(Order_Type, Order_Quantity)에 맞게 완벽히 매핑(AS)합니다!
+            string query = "SELECT symbol AS Symbol, symbol_name AS Name, type AS Order_Type, order_price AS Order_Price, quantity AS Order_Quantity, filled_quantity AS Filled_Quqntity, order_time AS Order_Time, Status AS Status, order_yield AS Order_Yield FROM TradeHistory ORDER BY id DESC LIMIT 500";
+
+            return GetDataTable(query);
         }
 
         // ====================================================================

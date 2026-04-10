@@ -48,6 +48,10 @@ namespace Jubby_AutoTrade_UI.GUI
 
                 dgv.CellClick -= DgvChart_CellClick; // (기존 쓰레기 이벤트 안전장치 제거)
 
+                if (dgv.DataSource is DataTable oldDt)
+                {
+                    oldDt.Dispose();
+                }
                 dgv.DataSource = dt.Copy();
 
                 if (scrollIdx >= 0 && scrollIdx < dgv.RowCount) dgv.FirstDisplayedScrollingRowIndex = scrollIdx;
@@ -183,17 +187,13 @@ namespace Jubby_AutoTrade_UI.GUI
             if (dgv.Columns.Count == 0 && ChartIndex == 0) // 마켓
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Last_Price", "현재가", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Open_Price", "시가", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "High_Price", "고가", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Low_Price", "저가", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Bid_Price", "매수호가", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Ask_Price", "매도호가", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Bid_Size", "매수잔량", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Ask_Size", "매도잔량", 60, DataGridViewContentAlignment.MiddleCenter);
+                // 파이썬이 안 주는 호가/잔량 컬럼들은 삭제했습니다 (빈칸 방지)
                 AddColumn(dgv, "Return_1m", "1분등락률", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Trade_Amount", "거래대금", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Vol_Energy", "거래량에너지", 60, DataGridViewContentAlignment.MiddleCenter);
@@ -222,7 +222,7 @@ namespace Jubby_AutoTrade_UI.GUI
                 AddColumn(dgv, "Order_Type", "주문종류", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Price", "주문가격", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Quantity", "주문수량", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Filled_Quqntity", "체결수량", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Filled_Quantity", "체결수량", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Status", "주문상태", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Yield", "수익률", 60, DataGridViewContentAlignment.MiddleCenter);
             }

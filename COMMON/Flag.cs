@@ -285,7 +285,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                     Order_Type = p["order_type"]?.ToString(),
                     Order_Price = ParseDecimal(p["order_price"], 0),
                     Order_Quantity = ParseDecimal(p["order_quantity"], 0),
-                    Filled_Quqntity = ParseDecimal(p["filled_quantity"], 0),
+                    Filled_Quantity = ParseDecimal(p["filled_quantity"], 0),
                     Order_Time = p["order_time"]?.ToString(),
                     // 상태값은 대소문자가 다를 수 있어 여러 키값을 찔러봅니다.
                     Status = p["Status"]?.ToString() ?? p["order_status"]?.ToString() ?? "",
@@ -337,7 +337,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             public string Order_Type { get; set; }       // 주문 종류 (매수/매도/취소 등)
             public decimal Order_Price { get; set; }     // 주문 가격
             public decimal Order_Quantity { get; set; }  // 주문 수량
-            public decimal Filled_Quqntity { get; set; } // 실제 체결된 수량
+            public decimal Filled_Quantity { get; set; } // 실제 체결된 수량
             public string Order_Time { get; set; }       // 주문 발생 시간
             public string Status { get; set; }           // 주문 상태 (접수, 체결 완료 등)
             public string Order_Yield { get; set; }      // 매도 시 기록되는 최종 수익률

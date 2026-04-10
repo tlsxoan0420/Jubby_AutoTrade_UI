@@ -73,53 +73,56 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
             // 1. 시장가(Market) 갱신
             foreach (DataRow row in marketDt.Rows)
             {
-                string symbol = row.Table.Columns.Contains("symbol") ? row["symbol"].ToString() : "";
+                // 💡 [상세 설명] DB_Manager에서 'AS Symbol'로 가져왔으므로 대문자 "Symbol"로 찾아야 합니다!
+                string symbol = row.Table.Columns.Contains("Symbol") ? row["Symbol"].ToString() : "";
                 if (string.IsNullOrEmpty(symbol)) continue;
 
                 if (!_memoryStocks.ContainsKey(symbol))
                 {
-                    string name = row.Table.Columns.Contains("symbol_name") ? row["symbol_name"].ToString() : symbol;
+                    string name = row.Table.Columns.Contains("Name") ? row["Name"].ToString() : symbol;
                     _memoryStocks[symbol] = new JubbyStockInfo(symbol, name);
                 }
 
                 var m = _memoryStocks[symbol].Market;
-                m.Last_Price = SafeGetDecimal(row, "last_price");
-                m.Open_Price = SafeGetDecimal(row, "open_price");
-                m.High_Price = SafeGetDecimal(row, "high_price");
-                m.Low_Price = SafeGetDecimal(row, "low_price");
-                m.Volume = SafeGetDecimal(row, "volume");
+                // 💡 [상세 설명] DB_Manager의 AS 별칭과 완벽하게 똑같이 대소문자를 맞춰줍니다!
+                m.Last_Price = SafeGetDecimal(row, "Last_Price");
+                m.Open_Price = SafeGetDecimal(row, "Open_Price");
+                m.High_Price = SafeGetDecimal(row, "High_Price");
+                m.Low_Price = SafeGetDecimal(row, "Low_Price");
+                m.Volume = SafeGetDecimal(row, "Volume");
             }
 
-            // 2. 🔥 전략 시그널(Strategy) 갱신 (추가됨!)
+            // 2. 전략 시그널(Strategy) 갱신
             if (strategyDt != null)
             {
                 foreach (DataRow row in strategyDt.Rows)
                 {
-                    string symbol = row.Table.Columns.Contains("symbol") ? row["symbol"].ToString() : "";
+                    string symbol = row.Table.Columns.Contains("Symbol") ? row["Symbol"].ToString() : "";
                     if (!string.IsNullOrEmpty(symbol) && _memoryStocks.ContainsKey(symbol))
                     {
                         var s = _memoryStocks[symbol].Strategy;
-                        s.Signal = row.Table.Columns.Contains("signal") ? row["signal"].ToString() : s.Signal;
+                        // 💡 [상세 설명] 대문자 "Signal"로 맞춤
+                        s.Signal = row.Table.Columns.Contains("Signal") ? row["Signal"].ToString() : s.Signal;
                     }
                 }
             }
 
-            // 3. 🔥 주문 기록(Order) 갱신 - 차트 매매 타점 마커용 (추가됨!)
+            // 3. 주문 기록(Order) 갱신
             if (orderDt != null)
             {
-                // 주문은 계속 쌓이므로 한 번 비우고 최신 내역으로 다시 채워줍니다.
                 foreach (var stock in _memoryStocks.Values) { stock.ClearOrders(); }
 
                 foreach (DataRow row in orderDt.Rows)
                 {
-                    string symbol = row.Table.Columns.Contains("symbol") ? row["symbol"].ToString() : "";
+                    string symbol = row.Table.Columns.Contains("Symbol") ? row["Symbol"].ToString() : "";
                     if (!string.IsNullOrEmpty(symbol) && _memoryStocks.ContainsKey(symbol))
                     {
                         TradeOrderData o = new TradeOrderData
                         {
-                            Order_Type = row.Table.Columns.Contains("order_type") ? row["order_type"].ToString() : "",
-                            Order_Price = SafeGetDecimal(row, "order_price"),
-                            Order_Time = row.Table.Columns.Contains("order_time") ? row["order_time"].ToString() : ""
+                            // 💡 [상세 설명] 대소문자 완벽 일치화
+                            Order_Type = row.Table.Columns.Contains("Order_Type") ? row["Order_Type"].ToString() : "",
+                            Order_Price = SafeGetDecimal(row, "Order_Price"),
+                            Order_Time = row.Table.Columns.Contains("Order_Time") ? row["Order_Time"].ToString() : ""
                         };
                         _memoryStocks[symbol].AddOrder(o);
                     }

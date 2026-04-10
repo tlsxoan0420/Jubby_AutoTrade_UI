@@ -379,11 +379,6 @@ namespace Jubby_AutoTrade_UI.GUI
 
             var info = Auto.Ins.GetStock(symbol);
             if (info == null) return;
-
-            if (!isBackupMode)
-            {
-                LoadChart(info);
-            }
         }
 
         internal void UpdateMarketData(Flag.JubbyStockInfo info)
@@ -406,28 +401,28 @@ namespace Jubby_AutoTrade_UI.GUI
                 var ohlcList = LiveOHLCData[sym];
                 var volList = LiveVolumeData[sym];
 
-                double open = m.Open_Price <= 0 ? (double)m.Last_Price : (double)m.Open_Price;
-                double high = m.High_Price <= 0 ? (double)m.Last_Price : (double)m.High_Price;
-                double low = m.Low_Price <= 0 ? (double)m.Last_Price : (double)m.Low_Price;
-
+                // 🔥 [버그 수정] 분봉 캔들은 오직 '현재가(m.Last_Price)'의 흐름만으로 계산해야 합니다!
                 if (ohlcList.Count > 0 && ohlcList.Last().DateTime == minuteTime)
                 {
+                    // 같은 1분 내에 가격이 변하면 캔들의 고가/저가/종가만 갱신
                     var last = ohlcList.Last();
-                    last.High = Math.Max(last.High, (double)m.High_Price);
-                    last.Low = Math.Min(last.Low, (double)m.Low_Price);
-                    if (last.Low <= 0) last.Low = (double)m.Last_Price;
+                    last.High = Math.Max(last.High, (double)m.Last_Price);
+                    last.Low = Math.Min(last.Low, (double)m.Last_Price);
                     last.Close = (double)m.Last_Price;
                     volList[volList.Count - 1] = (double)m.Volume;
                 }
                 else
                 {
-                    ohlcList.Add(new OHLC(open, high, low, (double)m.Last_Price, minuteTime, TimeSpan.FromMinutes(1)));
+                    // 새로운 1분이 시작되면 시/고/저/종가를 모두 방금 들어온 현재가로 셋팅
+                    ohlcList.Add(new OHLC((double)m.Last_Price, (double)m.Last_Price, (double)m.Last_Price, (double)m.Last_Price, minuteTime, TimeSpan.FromMinutes(1)));
                     volList.Add((double)m.Volume);
+
                     if (ohlcList.Count > MaxBars) ohlcList.RemoveAt(0);
                     if (volList.Count > MaxBars) volList.RemoveAt(0);
                 }
             }
 
+            // 현재 보고 있는 종목일 때만 차트 화면을 새로고침
             if (StockList.Count > 0 && CurrentIndex < StockList.Count)
             {
                 if (StockList[CurrentIndex].Symbol == sym) LoadChart(info);

@@ -70,12 +70,15 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         {
             if (marketDt == null) return;
 
+            var currentSymbols = new HashSet<string>(); // 현재 DB에 살아있는 종목들
+
             // 1. 시장가(Market) 갱신
             foreach (DataRow row in marketDt.Rows)
             {
-                // 💡 [상세 설명] DB_Manager에서 'AS Symbol'로 가져왔으므로 대문자 "Symbol"로 찾아야 합니다!
                 string symbol = row.Table.Columns.Contains("Symbol") ? row["Symbol"].ToString() : "";
                 if (string.IsNullOrEmpty(symbol)) continue;
+
+                currentSymbols.Add(symbol); // 생존 신고
 
                 if (!_memoryStocks.ContainsKey(symbol))
                 {
@@ -83,13 +86,23 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                     _memoryStocks[symbol] = new JubbyStockInfo(symbol, name);
                 }
 
+                // 1. 시장가(Market) 갱신 부분에서 아래 줄들을 확인하세요.
                 var m = _memoryStocks[symbol].Market;
-                // 💡 [상세 설명] DB_Manager의 AS 별칭과 완벽하게 똑같이 대소문자를 맞춰줍니다!
+
+                // 💡 [핵심] DB_Manager에서 'AS 별칭'으로 가져온 이름과 100% 똑같이 대소문자를 맞춰야 합니다!
                 m.Last_Price = SafeGetDecimal(row, "Last_Price");
                 m.Open_Price = SafeGetDecimal(row, "Open_Price");
                 m.High_Price = SafeGetDecimal(row, "High_Price");
                 m.Low_Price = SafeGetDecimal(row, "Low_Price");
                 m.Volume = SafeGetDecimal(row, "Volume");
+                m.Return_1m = SafeGetDecimal(row, "Return_1m"); // 👈 이 줄이 누락되었다면 추가하세요.
+            }
+
+            // 🔥 [버그 2 완벽 수정] 파이썬 DB에서 사라진 종목(매도 완료 등)은 C# 메모리에서도 즉시 삭제하여 차트와 표가 완벽히 동기화되게 합니다!
+            var symbolsToRemove = _memoryStocks.Keys.Where(k => !currentSymbols.Contains(k)).ToList();
+            foreach (var sym in symbolsToRemove)
+            {
+                _memoryStocks.Remove(sym);
             }
 
             // 2. 전략 시그널(Strategy) 갱신

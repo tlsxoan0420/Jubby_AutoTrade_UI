@@ -12,7 +12,8 @@ namespace Jubby_AutoTrade_UI.GUI
     public partial class FormDataChart : Form
     {
         private DataGridView[] dgvChartArray;
-        private bool isUpdatingGrid = false; // 🔥 [추가] 표 내용 교체 중 차트 조작 이벤트 폭주를 막는 잠금 변수
+        private bool isUpdatingGrid = false;
+        private DataGridView activeDgv = null; // 🔥 [추가] 지금 사용자가 클릭해서 보고 있는 '진짜 주인 표'를 기억합니다.
 
         public FormDataChart()
         {
@@ -104,7 +105,8 @@ namespace Jubby_AutoTrade_UI.GUI
             }
 
             // 2. 수익률 / 등락률 색상 입히기 및 % 기호 붙이기
-            if (colName == "Pnl_Rate" || colName == "Return_1m" || colName == "Order_Yield")
+            // 🔥 [수정] AI_Prob (상승확률) 도 같이 빨간색으로 예쁘게 칠해지도록 조건에 추가합니다!
+            if (colName == "Pnl_Rate" || colName == "Return_1m" || colName == "Order_Yield" || colName == "AI_Prob")
             {
                 if (double.TryParse(valStr.Replace("%", "").Replace(",", ""), out double val))
                 {
@@ -146,9 +148,11 @@ namespace Jubby_AutoTrade_UI.GUI
 
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
-                // 🔥 기존의 버벅이던 CellClick과 KeyUp 이벤트를 완전히 삭제하고!
-                // 마우스/키보드 모든 조작(위아래 꾹 누르기 포함)에 부드럽고 즉각적으로 반응하는 'SelectionChanged' 로 통합합니다.
-                dgvChartArray[i].SelectionChanged -= DgvChart_SelectionChanged;
+                // 🔥 사용자가 직접 마우스로 누른 표가 '차트의 주인'이 되도록 설정합니다.
+                dgvChartArray[i].MouseDown += (s, e) => { activeDgv = s as DataGridView; };
+                dgvChartArray[i].Enter += (s, e) => { activeDgv = s as DataGridView; };
+
+                dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
                 dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
 
                 dgvChartArray[i].CellFormatting -= DgvChart_CellFormatting;
@@ -157,14 +161,17 @@ namespace Jubby_AutoTrade_UI.GUI
                 SetGridStyle(dgvChartArray[i], i);
                 dgvChartArray[i].AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             }
+
+            if (dgvChartArray.Length > 0) activeDgv = dgvChartArray[0];
         }
 
         private void DgvChart_SelectionChanged(object sender, EventArgs e)
         {
-            // 🌟 백그라운드에서 표 데이터가 1초마다 최신화(통째로 교체) 되는 찰나에는 차트 전환을 무시합니다. (깜빡임 완벽 제거)
             if (isUpdatingGrid) return;
 
-            // 키보드든 마우스든 선택된 줄이 바뀌면 무조건 이 코드가 즉시 실행되어 차트를 변경합니다.
+            // 🔥 내가 지금 보고 있는(클릭한) 표가 보낸 신호가 아니면 차트 변경을 무시합니다!
+            if (sender != activeDgv) return;
+
             UpdateChartFromSelectedRow(sender as DataGridView);
         }
 
@@ -203,7 +210,7 @@ namespace Jubby_AutoTrade_UI.GUI
             else if (dgv.Columns.Count == 0 && ChartIndex == 1) // 계좌
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
+                // 🔥 [수정] DB에 없는 Time 컬럼 삭제
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Quantity", "보유수량", 60, DataGridViewContentAlignment.MiddleCenter);
@@ -215,6 +222,7 @@ namespace Jubby_AutoTrade_UI.GUI
             }
             else if (dgv.Columns.Count == 0 && ChartIndex == 2) // 주문
             {
+                // (이 부분은 수정 없이 그대로 유지)
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Time", "주문시간", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
@@ -229,9 +237,10 @@ namespace Jubby_AutoTrade_UI.GUI
             else if (dgv.Columns.Count == 0 && ChartIndex == 3) // 전략
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
+                // 🔥 [수정] DB에 없는 Time 컬럼 삭제하고 누락된 상승확률 추가
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "AI_Prob", "상승확률", 60, DataGridViewContentAlignment.MiddleCenter); // 💡 누락 복구!
                 AddColumn(dgv, "Ma_5", "단기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Ma_20", "장기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "RSI", "RSI 지표", 60, DataGridViewContentAlignment.MiddleCenter);

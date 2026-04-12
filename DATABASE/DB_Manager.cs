@@ -168,8 +168,8 @@ namespace Jubby_AutoTrade_UI.DATABASE
         // 2. 실시간 계좌 잔고 데이터 (Account Table 용)
         public DataTable GetAccountStatus()
         {
-            // 맨 앞에 time AS Time 을 추가하여 DB의 시간 데이터를 불러옵니다.
-            string query = "SELECT time AS Time, symbol AS Symbol, symbol_name AS Name, quantity AS Quantity, avg_price AS Avg_Price, current_price AS Current_Price, pnl_amt AS Pnl, pnl_rate AS Pnl_Rate, available_cash AS Available_Cash FROM AccountStatus";
+            // 🔥 [버그 수정] AccountStatus 테이블에는 time 컬럼이 없으므로 제외해야 에러가 발생하지 않습니다!
+            string query = "SELECT symbol AS Symbol, symbol_name AS Name, quantity AS Quantity, avg_price AS Avg_Price, current_price AS Current_Price, pnl_amt AS Pnl, pnl_rate AS Pnl_Rate, available_cash AS Available_Cash FROM AccountStatus";
             return GetDataTable(query);
         }
 

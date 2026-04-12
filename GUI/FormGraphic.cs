@@ -401,20 +401,27 @@ namespace Jubby_AutoTrade_UI.GUI
                 var ohlcList = LiveOHLCData[sym];
                 var volList = LiveVolumeData[sym];
 
-                // 🔥 [버그 수정] 분봉 캔들은 오직 '현재가(m.Last_Price)'의 흐름만으로 계산해야 합니다!
                 if (ohlcList.Count > 0 && ohlcList.Last().DateTime == minuteTime)
                 {
-                    // 같은 1분 내에 가격이 변하면 캔들의 고가/저가/종가만 갱신
+                    // 🔥 [기존 업데이트 로직 수정] 현재 캔들의 고가와 저가를 실시간으로 반영합니다.
                     var last = ohlcList.Last();
-                    last.High = Math.Max(last.High, (double)m.Last_Price);
-                    last.Low = Math.Min(last.Low, (double)m.Last_Price);
+                    last.High = Math.Max(last.High, (double)m.High_Price);
+                    last.Low = Math.Min(last.Low, (double)m.Low_Price);
                     last.Close = (double)m.Last_Price;
                     volList[volList.Count - 1] = (double)m.Volume;
                 }
                 else
                 {
-                    // 새로운 1분이 시작되면 시/고/저/종가를 모두 방금 들어온 현재가로 셋팅
-                    ohlcList.Add(new OHLC((double)m.Last_Price, (double)m.Last_Price, (double)m.Last_Price, (double)m.Last_Price, minuteTime, TimeSpan.FromMinutes(1)));
+                    // 🔥 [버그 수정] 새로운 1분이 시작될 때, 시/고/저/종가를 DB에서 넘어온 값으로 정확히 각각 셋팅합니다.
+                    // 이전에는 전부 m.Last_Price로 넣어버려서 납작한 선(도지)으로만 보였던 것입니다.
+                    ohlcList.Add(new OHLC(
+                        (double)m.Open_Price,  // 시가
+                        (double)m.High_Price,  // 고가
+                        (double)m.Low_Price,   // 저가
+                        (double)m.Last_Price,  // 종가
+                        minuteTime,
+                        TimeSpan.FromMinutes(1)
+                    ));
                     volList.Add((double)m.Volume);
 
                     if (ohlcList.Count > MaxBars) ohlcList.RemoveAt(0);
@@ -471,5 +478,33 @@ namespace Jubby_AutoTrade_UI.GUI
             }
             catch (Exception ex) { Console.WriteLine($"[차트 저장 오류] {ex.Message}"); }
         }
+
+        #region ## 차트 초기화 (Clear All Data) ##
+        public void ClearAllData()
+        {
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(ClearAllData));
+                return;
+            }
+
+            LiveOHLCData.Clear();
+            LiveVolumeData.Clear();
+            BackupOHLCData.Clear();
+            BackupVolumeData.Clear();
+            StockList.Clear();
+            CurrentIndex = 0;
+
+            if (CandlePlot != null) { FormsPlotMain.Plot.Remove(CandlePlot); CandlePlot = null; }
+            if (VolumePlot != null) { FormsPlotMain.Plot.Remove(VolumePlot); VolumePlot = null; }
+            if (BuyMarkers != null) { FormsPlotMain.Plot.Remove(BuyMarkers); BuyMarkers = null; }
+            if (SellMarkers != null) { FormsPlotMain.Plot.Remove(SellMarkers); SellMarkers = null; }
+
+            OHLCList.Clear();
+            OrderHistoryList.Clear();
+
+            FormsPlotMain.Refresh();
+        }
+        #endregion ## 차트 초기화 (Clear All Data) ##
     }
 }

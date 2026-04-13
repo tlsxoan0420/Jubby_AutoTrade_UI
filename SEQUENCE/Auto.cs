@@ -105,7 +105,7 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                 _memoryStocks.Remove(sym);
             }
 
-            // 2. 전략 시그널(Strategy) 갱신
+            // 2. 전략 시그널(Strategy) 갱신 (대략 70번째 줄)
             if (strategyDt != null)
             {
                 foreach (DataRow row in strategyDt.Rows)
@@ -114,17 +114,17 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                     if (!string.IsNullOrEmpty(symbol) && _memoryStocks.ContainsKey(symbol))
                     {
                         var s = _memoryStocks[symbol].Strategy;
-                        // 💡 [상세 설명] 대문자 "Signal"로 맞춤
                         s.Signal = row.Table.Columns.Contains("Signal") ? row["Signal"].ToString() : s.Signal;
+                        // 🔥 상태 메시지 매핑 추가
+                        s.Status_Msg = row.Table.Columns.Contains("Status_Msg") ? row["Status_Msg"].ToString() : s.Status_Msg;
                     }
                 }
             }
 
-            // 3. 주문 기록(Order) 갱신
+            // 3. 주문 기록(Order) 갱신 (대략 84번째 줄)
             if (orderDt != null)
             {
                 foreach (var stock in _memoryStocks.Values) { stock.ClearOrders(); }
-
                 foreach (DataRow row in orderDt.Rows)
                 {
                     string symbol = row.Table.Columns.Contains("Symbol") ? row["Symbol"].ToString() : "";
@@ -132,7 +132,7 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                     {
                         TradeOrderData o = new TradeOrderData
                         {
-                            // 💡 [상세 설명] 대소문자 완벽 일치화
+                            Order_No = row.Table.Columns.Contains("Order_No") ? row["Order_No"].ToString() : "", // 🔥 주문번호 매핑 추가
                             Order_Type = row.Table.Columns.Contains("Order_Type") ? row["Order_Type"].ToString() : "",
                             Order_Price = SafeGetDecimal(row, "Order_Price"),
                             Order_Time = row.Table.Columns.Contains("Order_Time") ? row["Order_Time"].ToString() : ""

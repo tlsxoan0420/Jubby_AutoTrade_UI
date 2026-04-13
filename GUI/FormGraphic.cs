@@ -401,24 +401,25 @@ namespace Jubby_AutoTrade_UI.GUI
                 var ohlcList = LiveOHLCData[sym];
                 var volList = LiveVolumeData[sym];
 
+                // 🔥 [버그 완벽 해결] 분봉 캔들은 오직 '현재가(m.Last_Price)'의 실시간 흐름만으로 조립해야 합니다!
                 if (ohlcList.Count > 0 && ohlcList.Last().DateTime == minuteTime)
                 {
-                    // 🔥 [기존 업데이트 로직 수정] 현재 캔들의 고가와 저가를 실시간으로 반영합니다.
                     var last = ohlcList.Last();
-                    last.High = Math.Max(last.High, (double)m.High_Price);
-                    last.Low = Math.Min(last.Low, (double)m.Low_Price);
+                    // 같은 1분 내에 가격이 들어오면, 무조건 '현재가'와 비교하여 고점/저점을 넓혀갑니다.
+                    last.High = Math.Max(last.High, (double)m.Last_Price);
+                    last.Low = Math.Min(last.Low, (double)m.Last_Price);
                     last.Close = (double)m.Last_Price;
                     volList[volList.Count - 1] = (double)m.Volume;
                 }
                 else
                 {
-                    // 🔥 [버그 수정] 새로운 1분이 시작될 때, 시/고/저/종가를 DB에서 넘어온 값으로 정확히 각각 셋팅합니다.
-                    // 이전에는 전부 m.Last_Price로 넣어버려서 납작한 선(도지)으로만 보였던 것입니다.
+                    // 새로운 1분이 시작되면, 파이썬의 지연된 시/고/저가 아니라,
+                    // '방금 막 1분이 시작되었을 때의 현재가'로 시/고/저/종을 똑같이 셋팅해서 캔들 생성을 시작합니다.
                     ohlcList.Add(new OHLC(
-                        (double)m.Open_Price,  // 시가
-                        (double)m.High_Price,  // 고가
-                        (double)m.Low_Price,   // 저가
-                        (double)m.Last_Price,  // 종가
+                        (double)m.Last_Price, // 시가
+                        (double)m.Last_Price, // 고가
+                        (double)m.Last_Price, // 저가
+                        (double)m.Last_Price, // 종가
                         minuteTime,
                         TimeSpan.FromMinutes(1)
                     ));

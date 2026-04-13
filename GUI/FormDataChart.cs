@@ -47,8 +47,6 @@ namespace Jubby_AutoTrade_UI.GUI
                 string selectedSymbol = "";
                 if (dgv.CurrentRow != null && dgv.Columns.Contains("Symbol")) selectedSymbol = dgv.CurrentRow.Cells["Symbol"].Value?.ToString();
 
-                dgv.CellClick -= DgvChart_CellClick; // (기존 쓰레기 이벤트 안전장치 제거)
-
                 if (dgv.DataSource is DataTable oldDt)
                 {
                     oldDt.Dispose();
@@ -118,7 +116,7 @@ namespace Jubby_AutoTrade_UI.GUI
                     e.FormattingApplied = true;
                 }
             }
-            // 3. 주문 종류를 한글로 완벽 번역
+            // 3. 주문 종류 및 상태를 한글로 완벽 번역 & 색상 입히기
             else if (colName == "Order_Type" || colName == "Status" || colName == "Signal")
             {
                 string upperVal = valStr.ToUpper();
@@ -127,6 +125,13 @@ namespace Jubby_AutoTrade_UI.GUI
                 else if (upperVal.Contains("SELL") || upperVal.Contains("매도")) { e.Value = "매도"; e.CellStyle.ForeColor = Color.DeepSkyBlue; }
                 else if (upperVal.Contains("BUY") || upperVal.Contains("매수") || upperVal.Contains("ADD")) { e.Value = "매수"; e.CellStyle.ForeColor = Color.Red; }
                 else if (upperVal.Contains("WAIT")) { e.Value = "대기"; e.CellStyle.ForeColor = Color.Yellow; }
+
+                // 🔥 상태값(체결, 취소 등) 색상 완벽 구현
+                if (valStr == "체결완료") e.CellStyle.ForeColor = Color.Lime;
+                else if (valStr == "미체결") e.CellStyle.ForeColor = Color.Yellow;
+                else if (valStr.Contains("주문취소")) e.CellStyle.ForeColor = Color.Red;
+                else if (valStr.Contains("매도완료")) e.CellStyle.ForeColor = Color.DeepSkyBlue;
+
                 e.FormattingApplied = true;
             }
             // 4. 숫자에 천단위 콤마(,) 렌더링
@@ -148,12 +153,12 @@ namespace Jubby_AutoTrade_UI.GUI
 
             for (int i = 0; i < dgvChartArray.Length; i++)
             {
-                // 🔥 사용자가 직접 마우스로 누른 표가 '차트의 주인'이 되도록 설정합니다.
-                dgvChartArray[i].MouseDown += (s, e) => { activeDgv = s as DataGridView; };
-                dgvChartArray[i].Enter += (s, e) => { activeDgv = s as DataGridView; };
+                // 🌟 [수정 완료] 불안정한 SelectionChanged 대신, 확실한 물리적 조작(마우스, 키보드)만 인식하게 합니다!
+                dgvChartArray[i].CellClick -= DgvChart_CellClick;
+                dgvChartArray[i].CellClick += DgvChart_CellClick;
 
-                dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
-                dgvChartArray[i].SelectionChanged += DgvChart_SelectionChanged;
+                dgvChartArray[i].KeyUp -= DgvChart_KeyUp;
+                dgvChartArray[i].KeyUp += DgvChart_KeyUp;
 
                 dgvChartArray[i].CellFormatting -= DgvChart_CellFormatting;
                 dgvChartArray[i].CellFormatting += DgvChart_CellFormatting;
@@ -167,12 +172,13 @@ namespace Jubby_AutoTrade_UI.GUI
 
         private void DgvChart_SelectionChanged(object sender, EventArgs e)
         {
-            if (isUpdatingGrid) return;
+            //if (isUpdatingGrid) return;
 
-            // 🔥 내가 지금 보고 있는(클릭한) 표가 보낸 신호가 아니면 차트 변경을 무시합니다!
-            if (sender != activeDgv) return;
+            //// 🔥 내가 지금 보고 있는(클릭한) 표가 보낸 신호가 아니면 차트 변경을 무시합니다!
+            //if (sender != activeDgv) return;
 
-            UpdateChartFromSelectedRow(sender as DataGridView);
+            //UpdateChartFromSelectedRow(sender as DataGridView);
+            return;
         }
 
         private void SetGridStyle(DataGridView dgv, int ChartIndex)
@@ -220,32 +226,32 @@ namespace Jubby_AutoTrade_UI.GUI
                 AddColumn(dgv, "Pnl_Rate", "수익률", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Available_Cash", "주문가능 금액", 80, DataGridViewContentAlignment.MiddleCenter);
             }
-            else if (dgv.Columns.Count == 0 && ChartIndex == 2) // 주문
+            else if (dgv.Columns.Count == 0 && ChartIndex == 2) // 주문 (파이썬과 순서/이름 완벽 통일)
             {
-                // (이 부분은 수정 없이 그대로 유지)
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Order_Time", "주문시간", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Order_No", "주문번호", 70, DataGridViewContentAlignment.MiddleCenter); // 🔥 추가
+                AddColumn(dgv, "Order_Time", "시간", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Type", "주문종류", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Price", "주문가격", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Quantity", "주문수량", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Filled_Quantity", "체결수량", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Status", "주문상태", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Status", "상태", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Order_Yield", "수익률", 60, DataGridViewContentAlignment.MiddleCenter);
             }
-            else if (dgv.Columns.Count == 0 && ChartIndex == 3) // 전략
+            else if (dgv.Columns.Count == 0 && ChartIndex == 3) // 전략 (파이썬과 순서/이름 완벽 통일)
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
-                // 🔥 [수정] DB에 없는 Time 컬럼 삭제하고 누락된 상승확률 추가
                 AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "AI_Prob", "상승확률", 60, DataGridViewContentAlignment.MiddleCenter); // 💡 누락 복구!
-                AddColumn(dgv, "Ma_5", "단기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Ma_20", "장기 이동평균", 80, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "RSI", "RSI 지표", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "MACD", "MACD 지표", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Signal", "전략 신호", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "AI_Prob", "상승확률", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Ma_5", "단기이평", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Ma_20", "장기이평", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "RSI", "RSI", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "MACD", "MACD", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Signal", "전략신호", 60, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Status_Msg", "상태메시지", 150, DataGridViewContentAlignment.MiddleLeft); // 🔥 추가 (폭을 넓게)
             }
         }
 

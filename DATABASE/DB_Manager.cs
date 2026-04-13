@@ -176,15 +176,15 @@ namespace Jubby_AutoTrade_UI.DATABASE
         // 3. 전략 분석 신호 데이터 (Strategy Table 용)
         public DataTable GetStrategyStatus()
         {
-            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, ai_prob AS AI_Prob, ma_5 AS Ma_5, ma_20 AS Ma_20, RSI AS RSI, macd AS MACD, signal AS Signal FROM StrategyStatus");
+            // 🔥 [수정] 파이썬에 있는 '상태메시지(status_msg)'를 추가로 가져옵니다!
+            return GetDataTable("SELECT symbol AS Symbol, symbol_name AS Name, ai_prob AS AI_Prob, ma_5 AS Ma_5, ma_20 AS Ma_20, RSI AS RSI, macd AS MACD, signal AS Signal, status_msg AS Status_Msg FROM StrategyStatus");
         }
 
         // 4. 매매 체결 영수증 데이터 (Order Table 용) - 최신 500개만
         public DataTable GetTradeHistory()
         {
-            // 🔥 [버그 완벽 수정] 파이썬 DB에 저장된 진짜 컬럼명(price, time)으로 수정하여 에러를 막았습니다!
-            string query = "SELECT symbol AS Symbol, symbol_name AS Name, type AS Order_Type, price AS Order_Price, quantity AS Order_Quantity, filled_quantity AS Filled_Quantity, time AS Order_Time, Status AS Status, order_yield AS Order_Yield FROM TradeHistory ORDER BY id DESC LIMIT 500";
-
+            // 🔥 [수정] 파이썬에 있는 '주문번호(order_no)'를 맨 앞에 추가로 가져옵니다!
+            string query = "SELECT order_no AS Order_No, time AS Order_Time, symbol AS Symbol, symbol_name AS Name, type AS Order_Type, price AS Order_Price, quantity AS Order_Quantity, filled_quantity AS Filled_Quantity, Status AS Status, order_yield AS Order_Yield FROM TradeHistory ORDER BY id DESC LIMIT 500";
             return GetDataTable(query);
         }
 

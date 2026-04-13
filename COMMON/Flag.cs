@@ -334,6 +334,7 @@ namespace Jubby_AutoTrade_UI.COMMON
 
         public class TradeOrderData
         {
+            public string Order_No { get; set; }         // 🔥 추가 (주문번호)
             public string Order_Type { get; set; }       // 주문 종류 (매수/매도/취소 등)
             public decimal Order_Price { get; set; }     // 주문 가격
             public decimal Order_Quantity { get; set; }  // 주문 수량
@@ -350,6 +351,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             public decimal RSI { get; set; }    // 상대강도지수 (과매수/과매도 지표)
             public decimal MACD { get; set; }   // MACD 추세 지표
             public string Signal { get; set; }  // AI가 뱉어내는 최종 매매 시그널 (예: "강력매수")
+            public string Status_Msg { get; set; }       // 🔥 추가 (상태 메시지)
         }
         #endregion
 

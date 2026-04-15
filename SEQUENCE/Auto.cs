@@ -105,7 +105,7 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                 _memoryStocks.Remove(sym);
             }
 
-            // 2. 전략 시그널(Strategy) 갱신 (대략 70번째 줄)
+            // 2. 전략 시그널(Strategy) 갱신
             if (strategyDt != null)
             {
                 foreach (DataRow row in strategyDt.Rows)
@@ -115,13 +115,18 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                     {
                         var s = _memoryStocks[symbol].Strategy;
                         s.Signal = row.Table.Columns.Contains("Signal") ? row["Signal"].ToString() : s.Signal;
-                        // 🔥 상태 메시지 매핑 추가
                         s.Status_Msg = row.Table.Columns.Contains("Status_Msg") ? row["Status_Msg"].ToString() : s.Status_Msg;
+
+                        // 🚀 [핵심 추가] 차트 화면이 쓸 수 있도록 보조지표들을 메모리에 확실히 담아줍니다!
+                        s.Ma_5 = SafeGetDecimal(row, "Ma_5");
+                        s.Ma_20 = SafeGetDecimal(row, "Ma_20");
+                        s.RSI = SafeGetDecimal(row, "RSI");
+                        s.MACD = SafeGetDecimal(row, "MACD");
                     }
                 }
             }
 
-            // 3. 주문 기록(Order) 갱신 (대략 84번째 줄)
+            // 3. 주문 기록(Order) 갱신
             if (orderDt != null)
             {
                 foreach (var stock in _memoryStocks.Values) { stock.ClearOrders(); }
@@ -132,10 +137,16 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                     {
                         TradeOrderData o = new TradeOrderData
                         {
-                            Order_No = row.Table.Columns.Contains("Order_No") ? row["Order_No"].ToString() : "", // 🔥 주문번호 매핑 추가
+                            Order_No = row.Table.Columns.Contains("Order_No") ? row["Order_No"].ToString() : "",
                             Order_Type = row.Table.Columns.Contains("Order_Type") ? row["Order_Type"].ToString() : "",
                             Order_Price = SafeGetDecimal(row, "Order_Price"),
-                            Order_Time = row.Table.Columns.Contains("Order_Time") ? row["Order_Time"].ToString() : ""
+                            Order_Time = row.Table.Columns.Contains("Order_Time") ? row["Order_Time"].ToString() : "",
+
+                            // 🚀 [핵심 추가] 수량, 상태, 수익률 매핑 누락 해결!
+                            Order_Quantity = SafeGetDecimal(row, "Order_Quantity"),
+                            Filled_Quantity = SafeGetDecimal(row, "Filled_Quantity"),
+                            Status = row.Table.Columns.Contains("Status") ? row["Status"].ToString() : "",
+                            Order_Yield = row.Table.Columns.Contains("Order_Yield") ? row["Order_Yield"].ToString() : "0.00%"
                         };
                         _memoryStocks[symbol].AddOrder(o);
                     }

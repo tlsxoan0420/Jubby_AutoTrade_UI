@@ -199,10 +199,11 @@ namespace Jubby_AutoTrade_UI.GUI
             }
         }
         #endregion ## EnableDrag ##
+
         #region ## Form Change ##
         public void FormChange(int frame)
         {
-            if (frame == Flag.ModeNumber.Hide)
+            if (frame == Flag.ModeNumber.Hide || frame == Flag.ModeNumber.Logout)
             {
                 this.Location = new Point(0, 0);
                 this.Size = new Size(2560, 60);
@@ -218,89 +219,92 @@ namespace Jubby_AutoTrade_UI.GUI
                 formMenu.TopLevel = false;
                 formMenu.TopMost = false;
 
-                PalMainArray[0].Visible = true;
+                PalMainArray[0].Controls.Clear();
                 PalMainArray[0].Location = new Point(0, 0);
                 PalMainArray[0].Size = new Size(2560, 60);
                 PalMainArray[0].Controls.Add(formMenu);
                 PalMainArray[0].Dock = DockStyle.Top;
 
                 formMenu.Show();
-                return;
-            }
 
-            if (frame == Flag.ModeNumber.Logout)
-            {
-                this.Location = new Point(0, 0);
-                this.Size = new Size(2560, 60);
-
-                PalMainArray[0].Visible = true;
-                PalMainArray[1].Visible = false;
-                PalMainArray[2].Visible = false;
-                PalMainArray[3].Visible = false;
-                PalMainArray[3].Dock = DockStyle.None;
-
-                formMenu.Location = new Point(0, 0);
-                formMenu.Size = new Size(PalMainArray[0].Width, PalMainArray[0].Height);
-                formMenu.TopLevel = false;
-                formMenu.TopMost = false;
-
-                PalMainArray[0].Visible = true;
-                PalMainArray[0].Location = new Point(0, 0);
-                PalMainArray[0].Size = new Size(2560, 60);
-                PalMainArray[0].Controls.Add(formMenu);
-                PalMainArray[0].Dock = DockStyle.Top;
-
-                formMenu.Show();
+                if (frame == Flag.ModeNumber.Hide) return;
             }
             else
             {
-
                 this.Location = new Point(0, 0);
                 this.Size = new Size(2560, 1440);
 
+                // 상단 메뉴 패널 세팅
                 formMenu.Location = new Point(0, 0);
                 formMenu.Size = new Size(PalMainArray[0].Width, PalMainArray[0].Height);
                 formMenu.TopLevel = false;
                 formMenu.TopMost = false;
 
-                Auto.Ins.formGraphic.Location = new Point(0, 0);
-                Auto.Ins.formGraphic.Size = new Size(PalMainArray[1].Width, PalMainArray[1].Height);
-                Auto.Ins.formGraphic.TopLevel = false;
-                Auto.Ins.formGraphic.TopMost = false;
+                PalMainArray[0].Visible = true;
+                PalMainArray[0].Location = new Point(0, 0);
+                PalMainArray[0].Size = new Size(2560, 60);
+                PalMainArray[0].Controls.Clear();
+                PalMainArray[0].Controls.Add(formMenu);
+                PalMainArray[0].Dock = DockStyle.Top;
 
-                Auto.Ins.formDataChart.Location = new Point(0, 0);
-                Auto.Ins.formDataChart.Size = new Size(PalMainArray[2].Width, PalMainArray[2].Height);
-                Auto.Ins.formDataChart.TopLevel = false;
-                Auto.Ins.formDataChart.TopMost = false;
-
+                // 하단 상태 패널 세팅
                 formStatus.Location = new Point(0, 0);
                 formStatus.Size = new Size(PalMainArray[3].Width, PalMainArray[3].Height);
                 formStatus.TopLevel = false;
                 formStatus.TopMost = false;
 
-                PalMainArray[0].Visible = true;
-                PalMainArray[0].Location = new Point(0, 0);
-                PalMainArray[0].Size = new Size(2560, 60);
-                PalMainArray[0].Controls.Add(formMenu);
-                PalMainArray[0].Dock = DockStyle.Top;
-
-                PalMainArray[1].Visible = true;
-                PalMainArray[1].Location = new Point(0, 60);
-                PalMainArray[1].Size = new Size(2560, 720);
-                PalMainArray[1].Controls.Add(Auto.Ins.formGraphic);
-
-                PalMainArray[2].Visible = true;
-                PalMainArray[2].Location = new Point(0, 780);
-                PalMainArray[2].Size = new Size(2560, 600);
-                PalMainArray[2].Controls.Add(Auto.Ins.formDataChart);
-
                 PalMainArray[3].Visible = true;
                 PalMainArray[3].Location = new Point(0, 1380);
                 PalMainArray[3].Size = new Size(2560, 60);
+                PalMainArray[3].Controls.Clear();
                 PalMainArray[3].Controls.Add(formStatus);
                 PalMainArray[3].Dock = DockStyle.Bottom;
+
+                // 🚀 [핵심 수정] 패널 내부 비우기 (잔상 중복 추가 방지)
+                PalMainArray[1].Controls.Clear();
+                PalMainArray[2].Controls.Clear();
+
+                if (frame == Flag.ModeNumber.Database)
+                {
+                    // 🚀 데이터베이스 모드일 때: PalMain1을 1320 사이즈로 넓혀서 formDataBase를 쏙 넣습니다!
+                    formDataBase.TopLevel = false;
+                    formDataBase.TopMost = false;
+
+                    PalMainArray[1].Visible = true;
+                    PalMainArray[1].Location = new Point(0, 60);
+                    PalMainArray[1].Size = new Size(2560, 1320); // 720 + 600 = 1320 (화면 꽉 채움)
+
+                    formDataBase.Location = new Point(0, 0);
+                    formDataBase.Size = new Size(PalMainArray[1].Width, PalMainArray[1].Height);
+                    PalMainArray[1].Controls.Add(formDataBase);
+
+                    PalMainArray[2].Visible = false; // 하단 표 패널은 숨김
+                }
+                else
+                {
+                    // 일반 모드 (Home, Simul, Auto)일 때: 기존처럼 차트와 데이터 표를 위/아래로 나눔
+                    Auto.Ins.formGraphic.TopLevel = false;
+                    Auto.Ins.formGraphic.TopMost = false;
+                    Auto.Ins.formDataChart.TopLevel = false;
+                    Auto.Ins.formDataChart.TopMost = false;
+
+                    PalMainArray[1].Visible = true;
+                    PalMainArray[1].Location = new Point(0, 60);
+                    PalMainArray[1].Size = new Size(2560, 720);
+                    Auto.Ins.formGraphic.Location = new Point(0, 0);
+                    Auto.Ins.formGraphic.Size = new Size(PalMainArray[1].Width, PalMainArray[1].Height);
+                    PalMainArray[1].Controls.Add(Auto.Ins.formGraphic);
+
+                    PalMainArray[2].Visible = true;
+                    PalMainArray[2].Location = new Point(0, 780);
+                    PalMainArray[2].Size = new Size(2560, 600);
+                    Auto.Ins.formDataChart.Location = new Point(0, 0);
+                    Auto.Ins.formDataChart.Size = new Size(PalMainArray[2].Width, PalMainArray[2].Height);
+                    PalMainArray[2].Controls.Add(Auto.Ins.formDataChart);
+                }
             }
 
+            // 모든 창을 숨기고 선택된 창만 띄움
             Auto.Ins.formGraphic.Hide();
             Auto.Ins.formDataChart.Hide();
             formStatus.Hide();
@@ -310,11 +314,9 @@ namespace Jubby_AutoTrade_UI.GUI
             switch (frame)
             {
                 case Flag.ModeNumber.Logout:
-
                     if (Share.Ins.IsFormOpen(typeof(FormLogin)) == false)
                     {
                         FormLogin formLogin = new FormLogin();
-
                         formLogin.Show();
                     }
                     else
@@ -325,6 +327,8 @@ namespace Jubby_AutoTrade_UI.GUI
                     break;
 
                 case Flag.ModeNumber.Home:
+                case Flag.ModeNumber.Simul:
+                case Flag.ModeNumber.Auto:
                     Auto.Ins.formGraphic.Show();
                     Auto.Ins.formDataChart.Show();
                     formStatus.Show();
@@ -335,23 +339,7 @@ namespace Jubby_AutoTrade_UI.GUI
                     formStatus.Show();
                     break;
 
-                case Flag.ModeNumber.Simul:
-                    Auto.Ins.formGraphic.Show();
-                    Auto.Ins.formDataChart.Show();
-                    formStatus.Show();
-                    break;
-
-                case Flag.ModeNumber.Auto:
-                    Auto.Ins.formGraphic.Show();
-                    Auto.Ins.formDataChart.Show();
-                    formStatus.Show();
-                    break;
-
                 case Flag.ModeNumber.Error:
-                    break;
-
-                default:
-
                     break;
             }
 

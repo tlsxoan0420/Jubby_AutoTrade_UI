@@ -45,6 +45,9 @@ namespace Jubby_AutoTrade_UI.GUI
         private void FormModeMenu_Load(object sender, EventArgs e)
         {
             UIUpdate();
+
+            // 🚀 [핵심 추가] 이 폼이 포커스(선택)를 잃어버리면 무조건 스스로 닫히게 만듭니다!
+            this.Deactivate += (s, ev) => this.Close();
         }
         #endregion ## FormModeMenu Load ##
 

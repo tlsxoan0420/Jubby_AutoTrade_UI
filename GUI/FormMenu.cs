@@ -105,13 +105,22 @@ namespace Jubby_AutoTrade_UI.GUI
                     if (Share.Ins.IsFormOpen(typeof(FormModeMenu)) == false)
                     {
                         FormModeMenu formModeMenu = new FormModeMenu();
-                        formModeMenu.Location = new Point(btnMenuArray[1].Location.X, btnMenuArray[1].Location.Y + 50);
+
+                        // 버튼 위치를 모니터 전체 화면 기준의 진짜 좌표로 변환
+                        Point screenPos = this.PointToScreen(btnMenuArray[1].Location);
+                        // 버튼 바로 아래에 예쁘게 딱 붙게 위치 설정
+                        formModeMenu.Location = new Point(screenPos.X, screenPos.Y + btnMenuArray[1].Height);
+
                         formModeMenu.Show();
+
+                        // 🚀 [핵심 추가] 창을 띄우자마자 강제로 마우스 포커스를 뺏어옵니다!
+                        // 이렇게 해야 다른 빈 공간이나 메인 폼을 클릭했을 때 FormModeMenu가 포커스를 잃고(Deactivate) 자동으로 닫힙니다.
+                        formModeMenu.Activate();
                     }
                     else
                     {
-                        Share.Ins.MessageFormOpen("이미 모드 변경 창이 열려 있습니다.");
-                        return;
+                        // 🚀 [편의성 추가] 모드 창이 열려있을 때 버튼을 한 번 더 누르면 닫히게(토글 기능) 만듭니다!
+                        Application.OpenForms.OfType<FormModeMenu>().FirstOrDefault()?.Close();
                     }
                     break;
 

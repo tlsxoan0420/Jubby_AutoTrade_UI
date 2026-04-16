@@ -29,7 +29,7 @@ namespace Jubby_AutoTrade_UI.GUI
         private void SubscribeToEvents()
         {
             Auto.Ins.OnMarketDataRefreshed += (dt) => UpdateGridDataSource(dgvChart1, dt);
-            Auto.Ins.OnAccountDataRefreshed += (dt) => UpdateGridDataSource(dgvChart2, dt);
+            // 🚀 dgvChart2(Account)는 Socket(TCP)으로 직접 그리므로 SQLite 연결을 해제합니다!
             Auto.Ins.OnOrderDataRefreshed += (dt) => UpdateGridDataSource(dgvChart3, dt);
             Auto.Ins.OnStrategyDataRefreshed += (dt) => UpdateGridDataSource(dgvChart4, dt);
         }
@@ -112,7 +112,7 @@ namespace Jubby_AutoTrade_UI.GUI
                     else if (val < 0) e.CellStyle.ForeColor = Color.DeepSkyBlue;
                     else e.CellStyle.ForeColor = Color.WhiteSmoke;
 
-                    e.Value = $"{val:F2}%";
+                    if (!valStr.Contains("%")) e.Value = $"{val:F2}%";
                     e.FormattingApplied = true;
                 }
             }
@@ -213,18 +213,21 @@ namespace Jubby_AutoTrade_UI.GUI
                 AddColumn(dgv, "Disparity", "이격도", 60, DataGridViewContentAlignment.MiddleCenter);
                 AddColumn(dgv, "Volume", "거래량", 60, DataGridViewContentAlignment.MiddleCenter);
             }
-            else if (dgv.Columns.Count == 0 && ChartIndex == 1) // 계좌
+            else if (dgv.Columns.Count == 0 && ChartIndex == 1) // 내 잔고 정보 데이터 (Socket 전용)
             {
                 AddColumn(dgv, "No", "번호", 40, DataGridViewContentAlignment.MiddleCenter);
-                // 🔥 [수정] DB에 없는 Time 컬럼 삭제
-                AddColumn(dgv, "Symbol", "종목코드", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Name", "종목명", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Quantity", "보유수량", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Avg_Price", "평균 매입가", 80, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Current_Price", "현재가", 80, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Pnl", "평가손익", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Pnl_Rate", "수익률", 60, DataGridViewContentAlignment.MiddleCenter);
-                AddColumn(dgv, "Available_Cash", "주문가능 금액", 80, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Time", "시간", 80, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Symbol", "종목코드", 70, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Name", "종목명", 110, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Quantity", "보유수량", 80, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Avg_Price", "평균매입가", 90, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Current_Price", "현재가", 90, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Pnl_Amt", "평가손익금", 90, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Pnl_Rate", "수익률", 80, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Status", "상태", 80, DataGridViewContentAlignment.MiddleCenter);
+                AddColumn(dgv, "Available_Cash", "주문가능금액", 110, DataGridViewContentAlignment.MiddleCenter);
+
+                dgv.AllowUserToAddRows = false; // 빈칸 생김 방지
             }
             else if (dgv.Columns.Count == 0 && ChartIndex == 2) // 주문 (파이썬과 순서/이름 완벽 통일)
             {
@@ -303,6 +306,53 @@ namespace Jubby_AutoTrade_UI.GUI
             {
                 UpdateChartFromSelectedRow(sender as DataGridView);
             }
+        }
+
+        public void UpdateAccountFromSocket(Flag.JubbyStockInfo stock)
+        {
+            if (this.IsDisposed) return;
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => UpdateAccountFromSocket(stock)));
+                return;
+            }
+
+            DataGridView dgv = dgvChart2; // 2번째 표(계좌 표)
+            isUpdatingGrid = true;
+
+            // 표에 이미 등록된 종목인지 검색
+            DataGridViewRow targetRow = null;
+            foreach (DataGridViewRow r in dgv.Rows)
+            {
+                if (r.Cells["Symbol"].Value?.ToString() == stock.Symbol)
+                {
+                    targetRow = r;
+                    break;
+                }
+            }
+
+            // 처음 들어온 종목이면 새로운 줄 생성
+            if (targetRow == null)
+            {
+                int rowIndex = dgv.Rows.Add();
+                targetRow = dgv.Rows[rowIndex];
+                targetRow.Cells["No"].Value = rowIndex + 1;
+                targetRow.Cells["Symbol"].Value = stock.Symbol;
+                targetRow.Cells["Name"].Value = stock.Name;
+            }
+
+            // 소켓으로 받은 데이터를 표의 각 칸에 세팅 (0이 되지 않게 "N0" 콤마 렌더링)
+            targetRow.Cells["Time"].Value = stock.MyAccount.Time;
+            targetRow.Cells["Quantity"].Value = stock.MyAccount.Quantity.ToString("N0");
+            targetRow.Cells["Avg_Price"].Value = stock.MyAccount.Avg_Price.ToString("N0");
+            targetRow.Cells["Current_Price"].Value = stock.MyAccount.Current_Price.ToString("N0");
+            targetRow.Cells["Pnl_Amt"].Value = stock.MyAccount.Pnl_Amt.ToString("N0");
+            targetRow.Cells["Pnl_Rate"].Value = stock.MyAccount.Pnl_Rate;
+            targetRow.Cells["Status"].Value = stock.MyAccount.Status;
+            targetRow.Cells["Available_Cash"].Value = stock.MyAccount.Available_Cash.ToString("N0");
+
+            dgv.Refresh();
+            isUpdatingGrid = false;
         }
     }
 

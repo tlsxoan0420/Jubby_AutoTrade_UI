@@ -235,25 +235,20 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         {
             try
             {
-                // 🔥 [핵심 안전장치] 데이터 읽는 도중 다음 0.5초가 도래해서 중복 실행되는 것을 방지!
                 dbPollingTimer.Stop();
 
                 DataTable marketDt = dbManager.GetMarketStatus();
-                DataTable accountDt = dbManager.GetAccountStatus();
                 DataTable strategyDt = dbManager.GetStrategyStatus();
                 DataTable orderDt = dbManager.GetTradeHistory();
-
                 DataTable logDt = dbManager.GetSharedLogs();
                 DataTable statusDt = dbManager.GetSystemStatus();
                 DataTable settingDt = dbManager.GetSharedSettings();
 
-                //UpdateMemoryStocks(marketDt);
-                // 📈 [핵심 연동] 차트 화면이 쓸 수 있도록 시장가, 전략, 주문 메모리에 최신화!
+                // 🚀 [핵심] Account(계좌) 테이블은 이제 TCP 소켓에서 전담하므로 SQLite 읽기를 완전히 차단합니다!
                 UpdateMemoryStocks(marketDt, strategyDt, orderDt);
 
-                // 2. 화면(Form) 쪽에 신호탄 발사! (UI 갱신)
                 OnMarketDataRefreshed?.Invoke(marketDt);
-                OnAccountDataRefreshed?.Invoke(accountDt);
+                // OnAccountDataRefreshed?.Invoke(accountDt); // ❌ 이 줄 삭제됨 (소켓이 그리므로 방해 금지!)
                 OnStrategyDataRefreshed?.Invoke(strategyDt);
                 OnOrderDataRefreshed?.Invoke(orderDt);
 
@@ -261,18 +256,8 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
                 OnSystemStatusRefreshed?.Invoke(statusDt);
                 OnSharedSettingsRefreshed?.Invoke(settingDt);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"DB 폴링 중 가벼운 에러 발생 (무시됨): {ex.Message}");
-            }
-            finally
-            {
-                // 시스템이 실행(Running) 중이라면 타이머를 다시 가동합니다.
-                if (Running)
-                {
-                    dbPollingTimer.Start();
-                }
-            }
+            catch (Exception ex) { Console.WriteLine($"DB 폴링 중 가벼운 에러 발생 (무시됨): {ex.Message}"); }
+            finally { if (Running) dbPollingTimer.Start(); }
         }
         #endregion
     }

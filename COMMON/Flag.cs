@@ -156,55 +156,43 @@ namespace Jubby_AutoTrade_UI.COMMON
             {
                 try
                 {
-                    // 'heartbeat'는 연결 유지용 더미 데이터이므로 쿨하게 무시합니다.
                     if (msg.MsgType.Equals("heartbeat", StringComparison.OrdinalIgnoreCase)) return;
-
-                    // 🚨 [강력 진단용 알림벨] 파이썬 통신 연결 직후 딱 1번만 환영 팝업을 띄웁니다.
-                    if (FirstSymbol == null && msg.MsgType.ToLower() == "market")
-                    {
-                        //System.Windows.Forms.MessageBox.Show(
-                        //    $"[C# 통신 연결 대성공!]\n\n파이썬에서 보낸 데이터가 C# 문을 열고 들어왔습니다!\n\n" +
-                        //    $"메시지 종류: {msg.MsgType}\n" +
-                        //    $"데이터 내용 일부: {msg.Payload?.ToString().Substring(0, Math.Min(100, msg.Payload.ToString().Length))}...",
-                        //    "C# 수신 테스트"
-                        //);
-                    }
-
-                    // 메시지 타입(market, order 등)이 약속된 UpdateTarget이 아니면 거릅니다.
                     if (!Enum.TryParse<UpdateTarget>(msg.MsgType, true, out UpdateTarget target)) return;
 
-                    // 데이터를 배열(JArray) 형태로 억지로라도 맞춰서 살려내는 구조대 코드입니다.
                     JArray payloadArray = msg.Payload as JArray;
                     if (payloadArray == null && msg.Payload != null)
                     {
                         try { payloadArray = JArray.FromObject(msg.Payload); } catch { }
                     }
 
-                    // 정상적으로 배열 형태의 데이터를 확보했다면 종목별로 돌면서 업데이트합니다.
                     if (payloadArray != null)
                     {
                         foreach (JToken item in payloadArray)
                         {
                             string symbol = item["symbol"]?.ToString();
-                            if (string.IsNullOrEmpty(symbol)) continue; // 종목 코드가 없으면 패스!
+                            if (string.IsNullOrEmpty(symbol)) continue;
 
                             string name = item["symbol_name"]?.ToString() ?? symbol;
 
-                            // 딕셔너리에 없는 새로운 종목이라면 새로 가입(new)시킵니다.
                             if (!_stocks.TryGetValue(symbol, out JubbyStockInfo info))
                             {
                                 info = new JubbyStockInfo(symbol, name);
                                 _stocks[symbol] = info;
-                                if (FirstSymbol == null) FirstSymbol = symbol; // 첫 종목 등록!
+                                if (FirstSymbol == null) FirstSymbol = symbol;
                             }
-                            else { info.Name = name; } // 이미 있으면 이름만 혹시 모르니 업데이트
+                            else { info.Name = name; }
 
-                            // 알아낸 데이터를 해당 종목 객체에 예쁘게 덮어씌웁니다.
+                            // 데이터 변환
                             ApplyUpdate(info, target, item);
 
+                            // 🚀 [핵심 추가] 파이썬에서 넘어온 실시간 데이터를 C# UI 표에 즉시 그립니다!
+                            if (target == UpdateTarget.Account || target == UpdateTarget.All)
+                            {
+                                Auto.Ins.formDataChart?.UpdateAccountFromSocket(info);
+                            }
 
-                            // 시장가(Market)이거나 전체(All) 업데이트인 경우, 차트 화면도 갱신하라고 명령합니다.
-                            if (target == UpdateTarget.Market || target == UpdateTarget.All)
+                            // 🚀 [핵심 추가] 해당 표의 데이터로 차트(그래프)도 실시간 렌더링!
+                            if (target == UpdateTarget.Market || target == UpdateTarget.Account || target == UpdateTarget.All)
                             {
                                 if (Auto.Ins.formGraphic != null)
                                 {
@@ -218,8 +206,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                 }
                 catch (Exception ex)
                 {
-                    // 에러가 나면 콘솔이 아니라 팝업으로 띄워서 즉시 확인 가능하게 만듭니다.
-                    Share.Ins.ErrorMessage($"[C# 수신 에러]\n{ex.Message}");
+                    Console.WriteLine($"[C# 수신 에러] {ex.Message}");
                 }
             }
 
@@ -227,9 +214,7 @@ namespace Jubby_AutoTrade_UI.COMMON
             private decimal ParseDecimal(JToken token, decimal defaultValue)
             {
                 if (token == null) return defaultValue;
-                // 콤마(,)와 퍼센트(%) 기호를 제거하고 공백을 지웁니다.
                 string strVal = token.ToString().Replace(",", "").Replace("%", "").Trim();
-                // 숫자로 변환 성공하면 변환값을, 실패하면 원래 가지고 있던 값을 그대로 씁니다.
                 if (decimal.TryParse(strVal, out decimal result)) return result;
                 return defaultValue;
             }
@@ -269,11 +254,13 @@ namespace Jubby_AutoTrade_UI.COMMON
             // [계좌 잔고 매핑]
             private void ApplyAccount(TradeAccountData acc, JToken p)
             {
+                acc.Time = p["time"]?.ToString() ?? acc.Time;
                 acc.Quantity = ParseDecimal(p["quantity"], acc.Quantity);
                 acc.Avg_Price = ParseDecimal(p["avg_price"], acc.Avg_Price);
                 acc.Current_Price = ParseDecimal(p["current_price"], acc.Current_Price);
                 acc.Pnl_Amt = ParseDecimal(p["pnl_amt"], acc.Pnl_Amt);
-                acc.Pnl_Rate = ParseDecimal(p["pnl_rate"], acc.Pnl_Rate);
+                acc.Pnl_Rate = p["pnl_rate"]?.ToString() ?? acc.Pnl_Rate;
+                acc.Status = p["status"]?.ToString() ?? acc.Status;
                 acc.Available_Cash = ParseDecimal(p["available_cash"], acc.Available_Cash);
             }
 
@@ -324,12 +311,14 @@ namespace Jubby_AutoTrade_UI.COMMON
 
         public class TradeAccountData
         {
-            public decimal Quantity { get; set; }       // 보유 수량
-            public decimal Avg_Price { get; set; }      // 매수 평균가
-            public decimal Current_Price { get; set; }  // 현재 평가 금액
-            public decimal Pnl_Amt { get; set; }        // 평가 손익 (원)
-            public decimal Pnl_Rate { get; set; }       // 수익률 (%)
-            public decimal Available_Cash { get; set; } // 매수 가능 예수금
+            public string Time { get; set; }           // 시간 (추가)
+            public decimal Quantity { get; set; }      // 보유 수량
+            public decimal Avg_Price { get; set; }     // 평균 매입가
+            public decimal Current_Price { get; set; } // 현재가
+            public decimal Pnl_Amt { get; set; }       // 평가 손익
+            public string Pnl_Rate { get; set; }       // 수익률 (소수점과 %를 그대로 받기 위해 문자열)
+            public string Status { get; set; }         // 상태 (추가)
+            public decimal Available_Cash { get; set; } // 주문가능금액
         }
 
         public class TradeOrderData

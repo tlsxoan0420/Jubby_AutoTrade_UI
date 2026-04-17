@@ -122,6 +122,7 @@ namespace Jubby_AutoTrade_UI.COMMON
                 this.Name = name;
             }
         }
+
         #endregion
 
         #region ## Jubby Data Manager (데이터 총괄 매니저) ##
@@ -151,6 +152,28 @@ namespace Jubby_AutoTrade_UI.COMMON
                 return null; // 못 찾으면 null 반환
             }
 
+            // 🚀 [추가] 통합 저장소 관리를 위한 헬퍼 함수
+            public JubbyStockInfo GetOrAddStock(string symbol, string name)
+            {
+                if (!_stocks.TryGetValue(symbol, out JubbyStockInfo info))
+                {
+                    info = new JubbyStockInfo(symbol, name);
+                    _stocks[symbol] = info;
+                    if (FirstSymbol == null) FirstSymbol = symbol;
+                }
+                else
+                {
+                    info.Name = name; // 이름 최신화
+                }
+                return info;
+            }
+
+            public void RemoveDeadStocks(HashSet<string> aliveSymbols)
+            {
+                var dead = _stocks.Keys.Where(k => !aliveSymbols.Contains(k)).ToList();
+                foreach (var k in dead) _stocks.Remove(k);
+            }
+
             // 파이썬으로부터 JSON 메시지가 도착하면 이 함수가 호출되어 데이터를 해석합니다.
             public void HandleMessage(JsonMessage msg)
             {
@@ -159,48 +182,57 @@ namespace Jubby_AutoTrade_UI.COMMON
                     if (msg.MsgType.Equals("heartbeat", StringComparison.OrdinalIgnoreCase)) return;
                     if (!Enum.TryParse<UpdateTarget>(msg.MsgType, true, out UpdateTarget target)) return;
 
+                    // 🚀 [수정 1] 단일 객체든 배열이든 에러 없이 유연하게 파싱하도록 보완
                     JArray payloadArray = msg.Payload as JArray;
                     if (payloadArray == null && msg.Payload != null)
                     {
-                        try { payloadArray = JArray.FromObject(msg.Payload); } catch { }
+                        if (msg.Payload is JObject obj) { payloadArray = new JArray(obj); }
+                        else { try { payloadArray = JArray.FromObject(msg.Payload); } catch { } }
                     }
 
                     if (payloadArray != null)
                     {
+                        // 🚀 [핵심 추가 1] 파이썬이 보내준 종목들을 기억할 '출석부' 생성
+                        HashSet<string> receivedSymbols = new HashSet<string>();
+
                         foreach (JToken item in payloadArray)
                         {
                             string symbol = item["symbol"]?.ToString();
                             if (string.IsNullOrEmpty(symbol)) continue;
 
+                            // 🚀 [핵심 추가 2] 이번에 들어온 종목코드를 출석부에 기록
+                            receivedSymbols.Add(symbol);
+
                             string name = item["symbol_name"]?.ToString() ?? symbol;
 
-                            if (!_stocks.TryGetValue(symbol, out JubbyStockInfo info))
-                            {
-                                info = new JubbyStockInfo(symbol, name);
-                                _stocks[symbol] = info;
-                                if (FirstSymbol == null) FirstSymbol = symbol;
-                            }
-                            else { info.Name = name; }
+                            JubbyStockInfo info = GetOrAddStock(symbol, name); // 💡 만들어둔 헬퍼 함수 재활용
 
                             // 데이터 변환
                             ApplyUpdate(info, target, item);
 
-                            // 🚀 [핵심 추가] 파이썬에서 넘어온 실시간 데이터를 C# UI 표에 즉시 그립니다!
+                            // C# UI 표에 즉시 그리기
                             if (target == UpdateTarget.Account || target == UpdateTarget.All)
                             {
+                                // 💡 만약 UpdateAccountFromSocket 내부에서 Invoke를 안 한다면 여기서 해주는 것이 안전합니다.
                                 Auto.Ins.formDataChart?.UpdateAccountFromSocket(info);
                             }
 
-                            // 🚀 [핵심 추가] 해당 표의 데이터로 차트(그래프)도 실시간 렌더링!
-                            if (target == UpdateTarget.Market || target == UpdateTarget.Account || target == UpdateTarget.All)
-                            {
-                                if (Auto.Ins.formGraphic != null)
-                                {
-                                    Auto.Ins.formGraphic.BeginInvoke(new Action(() => {
-                                        Auto.Ins.formGraphic.UpdateMarketData(info);
-                                    }));
-                                }
-                            }
+                            //// 차트(그래프) 실시간 렌더링 (주석 처리 유지)
+                            //if (target == UpdateTarget.Market || target == UpdateTarget.Account || target == UpdateTarget.All)
+                            //{
+                            //    if (Auto.Ins.formGraphic != null)
+                            //    {
+                            //        Auto.Ins.formGraphic.BeginInvoke(new Action(() => {
+                            //            Auto.Ins.formGraphic.UpdateMarketData(info);
+                            //        }));
+                            //    }
+                            //}
+                        }
+
+                        // 🚀 [핵심 추가 3] 루프가 끝난 뒤, 출석부(receivedSymbols)에 없는 종목(전량 매도)은 표에서 지우라고 명령!
+                        if (target == UpdateTarget.Account || target == UpdateTarget.All)
+                        {
+                            Auto.Ins.formDataChart?.SyncAccountGrid(receivedSymbols);
                         }
                     }
                 }
@@ -214,7 +246,10 @@ namespace Jubby_AutoTrade_UI.COMMON
             private decimal ParseDecimal(JToken token, decimal defaultValue)
             {
                 if (token == null) return defaultValue;
-                string strVal = token.ToString().Replace(",", "").Replace("%", "").Trim();
+                string strVal = token.ToString();
+                if (string.IsNullOrWhiteSpace(strVal)) return defaultValue; // 빈 문자열 방어
+
+                strVal = strVal.Replace(",", "").Replace("%", "").Trim();
                 if (decimal.TryParse(strVal, out decimal result)) return result;
                 return defaultValue;
             }
@@ -229,10 +264,19 @@ namespace Jubby_AutoTrade_UI.COMMON
                     case UpdateTarget.Order: ApplyOrder(info, p); break;                // 주문 기록 업데이트
                     case UpdateTarget.Strategy: ApplyStrategy(info.Strategy, p); break; // AI 지표 업데이트
                     case UpdateTarget.All: // 몽땅 다 업데이트
-                        if (p["market"] != null) ApplyMarket(info.Market, p["market"]);
-                        if (p["account"] != null) ApplyAccount(info.MyAccount, p["account"]);
-                        if (p["order"] != null) ApplyOrder(info, p["order"]);
-                        if (p["strategy"] != null) ApplyStrategy(info.Strategy, p["strategy"]);
+                                           // 💡 [중요 수정] p 자체가 하나의 종목 데이터를 담고 있으므로,
+                                           // 하위 키(market, account 등)가 없다면 p를 그대로 넘겨서 파싱을 시도해야 합니다.
+                        if (p["last_price"] != null) ApplyMarket(info.Market, p);
+                        else if (p["market"] != null) ApplyMarket(info.Market, p["market"]);
+
+                        if (p["quantity"] != null) ApplyAccount(info.MyAccount, p);
+                        else if (p["account"] != null) ApplyAccount(info.MyAccount, p["account"]);
+
+                        if (p["order_type"] != null) ApplyOrder(info, p);
+                        else if (p["order"] != null) ApplyOrder(info, p["order"]);
+
+                        if (p["signal"] != null) ApplyStrategy(info.Strategy, p);
+                        else if (p["strategy"] != null) ApplyStrategy(info.Strategy, p["strategy"]);
                         break;
                 }
             }
@@ -269,26 +313,28 @@ namespace Jubby_AutoTrade_UI.COMMON
             {
                 TradeOrderData o = new TradeOrderData
                 {
+                    Order_No = p["order_no"]?.ToString() ?? "", // 🚀 누락되었던 주문번호 추가
                     Order_Type = p["order_type"]?.ToString(),
                     Order_Price = ParseDecimal(p["order_price"], 0),
                     Order_Quantity = ParseDecimal(p["order_quantity"], 0),
                     Filled_Quantity = ParseDecimal(p["filled_quantity"], 0),
-                    Order_Time = p["order_time"]?.ToString(),
-                    // 상태값은 대소문자가 다를 수 있어 여러 키값을 찔러봅니다.
-                    Status = p["Status"]?.ToString() ?? p["order_status"]?.ToString() ?? "",
+                    Order_Time = p["order_time"]?.ToString() ?? p["time"]?.ToString() ?? "", // 🚀 time 키값 유연한 대응
+                    Status = p["status"]?.ToString() ?? p["Status"]?.ToString() ?? "",
                     Order_Yield = p["order_yield"]?.ToString() ?? "0.00%"
                 };
-                info.AddOrder(o); // 만들어진 주문 객체를 종목의 주문 리스트에 추가!
+                info.AddOrder(o);
             }
 
             // [AI 전략 지표 매핑]
             private void ApplyStrategy(TradeStrategyData s, JToken p)
             {
+                s.AI_Prob = ParseDecimal(p["ai_prob"], s.AI_Prob); // 🚀 누락되었던 AI 상승확률 파싱 추가
                 s.Ma_5 = ParseDecimal(p["ma_5"], s.Ma_5);
                 s.Ma_20 = ParseDecimal(p["ma_20"], s.Ma_20);
                 s.RSI = ParseDecimal(p["rsi"], s.RSI);
                 s.MACD = ParseDecimal(p["macd"], s.MACD);
                 s.Signal = p["signal"]?.ToString() ?? s.Signal;
+                s.Status_Msg = p["status_msg"]?.ToString() ?? s.Status_Msg; // 🚀 누락되었던 상태 메시지(이유) 파싱 추가
             }
         }
         #endregion
@@ -335,12 +381,13 @@ namespace Jubby_AutoTrade_UI.COMMON
 
         public class TradeStrategyData
         {
-            public decimal Ma_5 { get; set; }   // 5일(분) 이동평균선
-            public decimal Ma_20 { get; set; }  // 20일(분) 이동평균선
-            public decimal RSI { get; set; }    // 상대강도지수 (과매수/과매도 지표)
-            public decimal MACD { get; set; }   // MACD 추세 지표
-            public string Signal { get; set; }  // AI가 뱉어내는 최종 매매 시그널 (예: "강력매수")
-            public string Status_Msg { get; set; }       // 🔥 추가 (상태 메시지)
+            public decimal AI_Prob { get; set; } // 🚀 추가 (AI 확률)
+            public decimal Ma_5 { get; set; }    // 5일(분) 이동평균선
+            public decimal Ma_20 { get; set; }   // 20일(분) 이동평균선
+            public decimal RSI { get; set; }     // 상대강도지수 (과매수/과매도 지표)
+            public decimal MACD { get; set; }    // MACD 추세 지표
+            public string Signal { get; set; }   // AI가 뱉어내는 최종 매매 시그널
+            public string Status_Msg { get; set; } // 상태 메시지
         }
         #endregion
 

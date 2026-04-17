@@ -74,6 +74,8 @@ namespace Jubby_AutoTrade_UI.GUI
             UIUpdate();
 
             Auto.Ins.OnOrderDataRefreshed += CheckNewTradeAndNotify;
+
+            Auto.Ins.Run();
         }
         #endregion ## FormMain Load ##
 

@@ -9,6 +9,7 @@ using Jubby_AutoTrade_UI.COMMON;
 using Jubby_AutoTrade_UI.GUI;
 using Jubby_AutoTrade_UI.DATABASE; // 🔥 [추가] 파이썬 DB 리더기
 using static Jubby_AutoTrade_UI.COMMON.Flag;
+using Jubby_AutoTrade_UI.COM;
 
 namespace Jubby_AutoTrade_UI.SEQUENCE
 {
@@ -29,7 +30,11 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         // 🟢 0.5초마다 DB를 훔쳐보게 만들 자동 타이머
         private System.Timers.Timer dbPollingTimer;
 
+        // 🚀 [추가] 파이썬이 던지는 실시간 데이터를 받아낼 통신 직원!
+        public TcpJsonServer tcpServer;
+
         public bool Running = false;   // 전체 시스템 동작 상태 플래그
+
 
         // 기존 UI 창 관리 변수들 (화면 객체 미리 생성)
         public FormGraphic formGraphic = new FormGraphic();
@@ -176,6 +181,9 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
         {
             dbManager = new DB_Manager();
 
+            // 🚀 [여기에 핵심 추가!!] 통신 서버 객체를 실제로 생성해 줍니다!
+            tcpServer = new TcpJsonServer();
+
             // 500밀리초(0.5초) 간격으로 무한 반복되는 타이머 셋팅
             dbPollingTimer = new System.Timers.Timer(500);
             dbPollingTimer.Elapsed += DbPollingTimer_Elapsed;
@@ -192,6 +200,9 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
             Console.WriteLine("📡 [C# 시스템] SQLite DB 폴링 엔진 가동 시작!");
             dbPollingTimer.Start();
 
+            // 🚀 [핵심 추가] 파이썬과 통신할 9001번 포트(문)를 활짝 열어줍니다!
+            tcpServer.Start(9001);
+
             formGraphic.timer1.Interval = 100;
             formGraphic.timer1.Enabled = true;
         }
@@ -206,6 +217,9 @@ namespace Jubby_AutoTrade_UI.SEQUENCE
 
             Console.WriteLine("🛑 [C# 시스템] SQLite DB 폴링 엔진 가동 중단!");
             dbPollingTimer.Stop();
+
+            // 🚀 [추가] 시스템 종료 시 통신 포트도 안전하게 닫아줍니다.
+            tcpServer.Stop();
 
             if (formGraphic != null && formGraphic.IsHandleCreated && !formGraphic.IsDisposed)
             {

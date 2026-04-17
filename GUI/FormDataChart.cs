@@ -354,6 +354,47 @@ namespace Jubby_AutoTrade_UI.GUI
             dgv.Refresh();
             isUpdatingGrid = false;
         }
+
+        // 🚀 [동기화 마법] 매도되어 잔고가 0이 된 종목을 표에서 즉시 치워버리는 함수
+        // =========================================================================
+        // 🚀 [마법의 빗자루] 파이썬 잔고에 없는 종목(전량 매도)을 C# 표에서 즉시 지워줍니다.
+        // =========================================================================
+        public void SyncAccountGrid(HashSet<string> currentSymbols)
+        {
+            if (this.IsDisposed) return;
+            if (this.InvokeRequired)
+            {
+                this.BeginInvoke(new Action(() => SyncAccountGrid(currentSymbols)));
+                return;
+            }
+
+            DataGridView dgv = dgvChart2; // Account 표
+
+            bool removed = false;
+
+            // 🚨 지울 때는 표의 인덱스가 꼬이지 않게 반드시 맨 밑(역순)부터 검사하며 지워야 합니다!
+            for (int i = dgv.Rows.Count - 1; i >= 0; i--)
+            {
+                string sym = dgv.Rows[i].Cells["Symbol"].Value?.ToString();
+
+                // 표에는 있는데, 이번에 파이썬이 보내준 명부에 없다면? -> 매도된 거니까 삭제!
+                if (!string.IsNullOrEmpty(sym) && !currentSymbols.Contains(sym))
+                {
+                    dgv.Rows.RemoveAt(i);
+                    removed = true;
+                }
+            }
+
+            // 지워진 게 있다면 번호(No)를 1번부터 예쁘게 다시 매겨줍니다.
+            if (removed)
+            {
+                for (int i = 0; i < dgv.Rows.Count; i++)
+                {
+                    dgv.Rows[i].Cells["No"].Value = (i + 1).ToString();
+                }
+                dgv.Refresh();
+            }
+        }
     }
 
     public static class ExtensionMethods

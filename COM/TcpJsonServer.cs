@@ -20,7 +20,7 @@ namespace Jubby_AutoTrade_UI.COM
     // 대량 데이터 안정적으로 수신 가능
     // Heartbeat 기반으로 클라이언트 생존 여부 체크 가능
 
-    class TcpJsonServer
+    public class TcpJsonServer
     {
         private TcpListener Listener;  // TCP 서버 리스너
         private Thread ListenThread;  // 클라이언트 접속 감지 스레드
